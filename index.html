@@ -215,6 +215,11 @@ let sb = null;
 let SB_URL = store.get('foko_url') || '';
 let SB_KEY = store.get('foko_key') || '';
 
+/* ---- Amazon (Sheet) · CSV publicado de Google Sheets (solo lectura) ---- */
+const AMAZON_CSV_DEFAULT = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQQRkYw71liR8DaKjqEwlm-PfykI8lLUwKkAepoWvYv-ZEONO5tN3N6WB059d_5RP0ynegu8GlqDCpY/pub?output=csv';
+let AMAZON_CSV = store.get('foko_amazon_csv') || AMAZON_CSV_DEFAULT;
+const sheetState = { cols:null, rows:null, loading:false, error:null, updatedAt:null }; // cache en memoria
+
 /* ---- iconos (lucide-ish) ---- */
 const I = {
   dash:'<path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/>',
@@ -229,7 +234,9 @@ const I = {
   search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   x:'<path d="M18 6 6 18M6 6l12 12"/>',
   inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.5 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.5A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.5z"/>',
-  menu:'<path d="M3 12h18M3 6h18M3 18h18"/>'
+  menu:'<path d="M3 12h18M3 6h18M3 18h18"/>',
+  sheet:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  refresh:'<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>'
 };
 const icon = (p,cls='')=>`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 
@@ -423,6 +430,7 @@ function sidebar(){
     <button class="nav-item ${route==='dashboard'?'active':''}" onclick="go('dashboard')">${icon(I.dash)}<span>Dashboard</span></button>
     <div class="nav-lbl">Trabajo</div>
     ${item('entregas_amazon',I.box,'Amazon',counts.entregas_amazon)}
+    <button class="nav-item ${route==='amazon_sheet'?'active':''}" onclick="go('amazon_sheet')">${icon(I.sheet)}<span>Amazon (Sheet)</span></button>
     ${item('publicaciones',I.megaphone,'Publicaciones',counts.publicaciones)}
     ${item('mantenimientos_web',I.wrench,'Mantenimientos',counts.mantenimientos_web)}
     <div class="nav-lbl">Plata</div>
@@ -529,6 +537,90 @@ function entityView(table){
   </div>`;
 }
 
+/* =====================================================================
+   AMAZON (SHEET) · solo lectura desde CSV publicado
+   ===================================================================== */
+/* Parser CSV robusto: comillas dobles, comas y saltos de línea dentro de celda */
+function parseCSV(text){
+  const rows=[]; let row=[]; let field=''; let inQ=false; let i=0;
+  const n=text.length;
+  while(i<n){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){
+        if(text[i+1]==='"'){ field+='"'; i+=2; continue; } // comilla escapada ""
+        inQ=false; i++; continue;
+      }
+      field+=c; i++; continue;
+    }
+    if(c==='"'){ inQ=true; i++; continue; }
+    if(c===','){ row.push(field); field=''; i++; continue; }
+    if(c==='\r'){ i++; continue; }
+    if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+    field+=c; i++;
+  }
+  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.some(cell=>String(cell).trim()!=='')); // descartar filas vacías
+}
+
+const pad2 = n => String(n).padStart(2,'0');
+
+window.loadSheet = async ()=>{
+  sheetState.loading=true; sheetState.error=null; render();
+  try{
+    const res = await fetch(AMAZON_CSV,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    const matrix = parseCSV(text);
+    if(!matrix.length) throw new Error('sin datos');
+    sheetState.cols = matrix[0];
+    sheetState.rows = matrix.slice(1);
+    sheetState.updatedAt = new Date();
+    sheetState.error = null;
+  }catch(e){
+    console.error('sheet',e);
+    sheetState.error = 'No pude leer el Sheet. Verificá que siga publicado como CSV';
+    // se conserva el último resultado cacheado (sheetState.rows/cols) si había
+  }finally{
+    sheetState.loading=false; render();
+  }
+};
+
+function sheetView(){
+  const s=sheetState;
+  // primera carga perezosa (sin recursión con render)
+  if(s.rows===null && !s.loading && !s.error){ setTimeout(window.loadSheet,0); }
+
+  let inner;
+  if(s.loading && s.rows===null){
+    inner=`<div class="spinner"></div>`;
+  } else if(s.error && s.rows===null){
+    inner=`<div class="tbl-wrap"><div class="empty">${icon(I.inbox)}<h4>No se pudo leer</h4><p>${esc(s.error)}</p><button class="btn btn-primary" style="margin:auto" onclick="loadSheet()">${icon(I.refresh)} Reintentar</button></div></div>`;
+  } else if(s.rows){
+    const head=`<tr>${s.cols.map(c=>`<th>${esc(c)||'—'}</th>`).join('')}</tr>`;
+    const body = s.rows.length
+      ? s.rows.map(r=>`<tr>${s.cols.map((_,i)=>`<td>${esc(r[i]??'')}</td>`).join('')}</tr>`).join('')
+      : `<tr><td colspan="${s.cols.length}"><div class="empty">${icon(I.inbox)}<h4>El Sheet no tiene filas</h4></div></td></tr>`;
+    inner=`<div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  } else {
+    inner=`<div class="spinner"></div>`;
+  }
+
+  const updated = s.updatedAt ? `Actualizado ${pad2(s.updatedAt.getHours())}:${pad2(s.updatedAt.getMinutes())}` : '';
+  const meta = [
+    updated ? `<span class="mono" style="font-size:11px;color:var(--muted)">${updated}</span>` : '',
+    (s.loading && s.rows) ? `<span class="mono" style="font-size:11px;color:var(--accent-dim)">cargando…</span>` : '',
+    (s.error && s.rows) ? `<span class="mono" style="font-size:11px;color:var(--danger)">${esc(s.error)}</span>` : ''
+  ].filter(Boolean).join('');
+
+  return `<div class="view">
+    <div class="view-head"><div><h1>Amazon (Sheet)</h1><div class="sub">solo lectura · google sheet</div></div>
+      <button class="btn btn-ghost" onclick="loadSheet()" ${s.loading?'disabled':''}>${icon(I.refresh)} Actualizar</button></div>
+    ${meta?`<div class="toolbar">${meta}</div>`:''}
+    ${inner}
+  </div>`;
+}
+
 /* ---- config view ---- */
 function configView(){
   return `<div class="view"><div class="view-head"><div><h1>Ajustes</h1><div class="sub">conexión a Supabase</div></div></div>
@@ -536,6 +628,9 @@ function configView(){
       <div class="field"><label>Supabase URL</label><input id="cfgUrl" value="${esc(SB_URL)}" placeholder="https://xxxx.supabase.co"></div>
       <div class="field"><label>Anon / publishable key</label><input id="cfgKey" value="${esc(SB_KEY)}" placeholder="eyJh...  o  sb_publishable_..."></div>
       <div style="display:flex;gap:10px;margin-top:6px"><button class="btn btn-primary" onclick="saveCfg()">Guardar y reconectar</button></div>
+      <div style="height:1px;background:var(--border);margin:6px 0"></div>
+      <div class="field"><label>Amazon (Sheet) · CSV URL</label><input id="cfgCsv" value="${esc(AMAZON_CSV)}" placeholder="https://docs.google.com/.../pub?output=csv"></div>
+      <div style="display:flex;gap:10px"><button class="btn btn-ghost" onclick="saveCsv()">Guardar URL del Sheet</button></div>
       <div class="setup hint" style="margin:0;padding:16px 0 0">// Se guardan en este navegador (localStorage).<br>// Corré el panel con un server local, ej:<br>&nbsp;&nbsp;python -m http.server 5500<br>// o la extensión Live Server de VS Code.</div>
     </div></div></div>`;
 }
@@ -544,6 +639,7 @@ function configView(){
 function render(){
   let content;
   if(route==='dashboard') content=dashboard();
+  else if(route==='amazon_sheet') content=sheetView();
   else if(route==='config') content=configView();
   else content=entityView(route);
   $('#root').innerHTML=`<div id="app">
@@ -640,6 +736,13 @@ window.saveCfg=()=>{
   if(!url||!key){ toast('Completá URL y key','err'); return; }
   store.set('foko_url',url); store.set('foko_key',key);
   SB_URL=url; SB_KEY=key; boot();
+};
+window.saveCsv=()=>{
+  const url=$('#cfgCsv').value.trim();
+  if(!url){ toast('Completá la URL del CSV','err'); return; }
+  store.set('foko_amazon_csv',url); AMAZON_CSV=url;
+  sheetState.cols=null; sheetState.rows=null; sheetState.error=null; sheetState.updatedAt=null; // fuerza re-fetch
+  toast('URL del Sheet guardada ✓','ok');
 };
 
 /* =====================================================================
