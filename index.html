@@ -374,7 +374,8 @@ async function saveRow(table,row,id){
   if(id){ const {error}=await sb.from(table).update(row).eq('id',id); if(error) throw error; }
   else { const {error}=await sb.from(table).insert(row); if(error) throw error; }
 }
-async function deleteRow(table,id){ const {error}=await sb.from(table).delete().eq('id',id); if(error) throw error; }
+async function deleteRow(table,id){ const {data,error}=await sb.from(table).delete().eq('id',id).select(); if(error) throw error; return data||[]; }
+async function deleteRows(table,ids){ const {data,error}=await sb.from(table).delete().in('id',ids).select(); if(error) throw error; return data||[]; }
 
 /* =====================================================================
    STATE + RENDER
@@ -475,26 +476,46 @@ function dashboard(){
   </div>`;
 }
 
-/* ---- generic entity view ---- */
-function entityView(table){
+/* ---- rows visible after filter+search (shared by view & selección) ---- */
+function visibleRows(table){
   const E=ENTITIES[table];
-  const st=uiState[table]||(uiState[table]={search:'',filter:''});
+  const st=uiState[table]||(uiState[table]={search:'',filter:'',sel:new Set()});
+  if(!st.sel) st.sel=new Set();
   let rows=orderRows(table);
   if(st.filter) rows=rows.filter(x=>x[E.filterField]===st.filter);
   if(st.search){ const q=st.search.toLowerCase(); rows=rows.filter(x=>E.search.some(f=>(x[f]||'').toString().toLowerCase().includes(q))); }
+  return rows;
+}
+
+/* ---- generic entity view ---- */
+function entityView(table){
+  const E=ENTITIES[table];
+  const rows=visibleRows(table);
+  const st=uiState[table];
 
   const filterChips = E.filterField ? `
     <button class="chip ${!st.filter?'on':''}" onclick="setFilter('${table}','')">Todas</button>
     ${E.filterOpts.map(o=>`<button class="chip ${st.filter===o?'on':''}" onclick="setFilter('${table}','${o}')">${esc(o)}</button>`).join('')}` : '';
 
-  const head=`<tr>${E.cols.map(c=>`<th${c.cls==='num'?' style="text-align:right"':''}>${c.h}</th>`).join('')}<th style="text-align:right">Acciones</th></tr>`;
+  const allChecked = rows.length>0 && rows.every(x=>st.sel.has(x.id));
+  const checkTh=`<th style="width:34px;text-align:center"><input type="checkbox" ${allChecked?'checked':''} title="Seleccionar todo" onclick="toggleSelAll('${table}',this.checked)" style="accent-color:var(--accent);cursor:pointer;width:15px;height:15px;vertical-align:middle"></th>`;
+  const checkTd=x=>`<td style="text-align:center"><input type="checkbox" ${st.sel.has(x.id)?'checked':''} onclick="toggleSel('${table}',${x.id},this.checked)" style="accent-color:var(--accent);cursor:pointer;width:15px;height:15px;vertical-align:middle"></td>`;
+
+  const head=`<tr>${checkTh}${E.cols.map(c=>`<th${c.cls==='num'?' style="text-align:right"':''}>${c.h}</th>`).join('')}<th style="text-align:right">Acciones</th></tr>`;
   const body = rows.length ? rows.map(x=>`<tr>
+    ${checkTd(x)}
     ${E.cols.map(c=>`<td${c.cls==='num'?' class="num"':''}>${c.r(x)}</td>`).join('')}
     <td><div class="acts">
       <button class="btn-icon" title="Editar" onclick="openForm('${table}',${x.id})">${icon(I.edit)}</button>
       <button class="btn-icon del" title="Borrar" onclick="askDelete('${table}',${x.id})">${icon(I.trash)}</button>
     </div></td></tr>`).join('')
-    : `<tr><td colspan="${E.cols.length+1}"><div class="empty">${icon(I.inbox)}<h4>No hay nada acá todavía</h4><p>Cargá tu primer registro y empezá a llevar el control.</p><button class="btn btn-primary" style="margin:auto" onclick="openForm('${table}')">${icon(I.plus)} Agregar</button></div></td></tr>`;
+    : `<tr><td colspan="${E.cols.length+2}"><div class="empty">${icon(I.inbox)}<h4>No hay nada acá todavía</h4><p>Cargá tu primer registro y empezá a llevar el control.</p><button class="btn btn-primary" style="margin:auto" onclick="openForm('${table}')">${icon(I.plus)} Agregar</button></div></td></tr>`;
+
+  const selBar = st.sel.size ? `<div class="toolbar" style="justify-content:flex-start;background:var(--surface);border:1px solid var(--border-str);border-radius:10px;padding:9px 14px">
+    <span class="mono" style="font-size:12px;color:var(--accent-dim)">${st.sel.size} seleccionado${st.sel.size>1?'s':''}</span>
+    <button class="btn btn-ghost" style="margin-left:auto" onclick="clearSel('${table}')">Deseleccionar</button>
+    <button class="btn btn-ghost" style="border-color:rgba(248,113,113,.4);color:var(--danger)" onclick="deleteSelected('${table}')">${icon(I.trash)} Borrar seleccionados</button>
+  </div>` : '';
 
   return `<div class="view">
     <div class="view-head"><div><h1>${E.title}</h1><div class="sub">${E.sub}</div></div>
@@ -503,6 +524,7 @@ function entityView(table){
       <div class="search">${icon(I.search)}<input placeholder="Buscar…" value="${esc(st.search)}" oninput="setSearch('${table}',this.value)"></div>
       ${filterChips}
     </div>
+    ${selBar}
     <div class="tbl-wrap"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>
   </div>`;
 }
@@ -537,9 +559,27 @@ function render(){
 /* =====================================================================
    ACTIONS
    ===================================================================== */
-window.go=r=>{ route=r; render(); const s=document.getElementById('side'); if(s)s.classList.remove('open'); };
-window.setSearch=(t,v)=>{ uiState[t].search=v; const el=document.activeElement; render(); const inp=$('.search input'); if(inp){inp.focus();inp.setSelectionRange(v.length,v.length);} };
-window.setFilter=(t,v)=>{ uiState[t].filter=v; render(); };
+window.go=r=>{ Object.values(uiState).forEach(s=>s&&s.sel&&s.sel.clear()); route=r; render(); const s=document.getElementById('side'); if(s)s.classList.remove('open'); };
+window.setSearch=(t,v)=>{ uiState[t].search=v; if(uiState[t].sel)uiState[t].sel.clear(); const el=document.activeElement; render(); const inp=$('.search input'); if(inp){inp.focus();inp.setSelectionRange(v.length,v.length);} };
+window.setFilter=(t,v)=>{ uiState[t].filter=v; if(uiState[t].sel)uiState[t].sel.clear(); render(); };
+
+/* ---- selección múltiple ---- */
+window.toggleSel=(table,id,checked)=>{ const st=uiState[table]; if(!st.sel)st.sel=new Set(); if(checked)st.sel.add(id); else st.sel.delete(id); render(); };
+window.toggleSelAll=(table,checked)=>{ const st=uiState[table]; if(!st.sel)st.sel=new Set(); const rows=visibleRows(table); if(checked)rows.forEach(x=>st.sel.add(x.id)); else rows.forEach(x=>st.sel.delete(x.id)); render(); };
+window.clearSel=table=>{ const st=uiState[table]; if(st&&st.sel)st.sel.clear(); render(); };
+window.deleteSelected=async table=>{
+  const st=uiState[table]; if(!st||!st.sel||!st.sel.size) return;
+  const ids=[...st.sel];
+  if(!confirm(`¿Borrar ${ids.length} registro${ids.length>1?'s':''}? No se puede deshacer.`)) return;
+  try{
+    const deleted=await deleteRows(table,ids);
+    if(!deleted.length){ toast('No se pudo borrar (revisá permisos RLS)','err'); return; }
+    const gone=new Set(deleted.map(x=>x.id));
+    cache[table]=cache[table].filter(x=>!gone.has(x.id));
+    st.sel.clear(); render();
+    toast(`${deleted.length} borrado${deleted.length>1?'s':''} ✓`,'ok');
+  }catch(e){ console.error(e); toast('Error al borrar: '+(e.message||e),'err'); }
+};
 
 /* modal form */
 let editing={table:null,id:null};
@@ -584,8 +624,14 @@ window.submitForm=async()=>{
 };
 window.askDelete=async(table,id)=>{
   if(!confirm('¿Borrar este registro? No se puede deshacer.')) return;
-  try{ await deleteRow(table,id); cache[table]=cache[table].filter(x=>x.id!==id); render(); toast('Borrado','ok'); }
-  catch(e){ toast('Error al borrar','err'); }
+  try{
+    const deleted=await deleteRow(table,id);
+    if(!deleted.length){ toast('No se pudo borrar (revisá permisos RLS)','err'); return; }
+    cache[table]=cache[table].filter(x=>x.id!==id);
+    const st=uiState[table]; if(st&&st.sel)st.sel.delete(id);
+    render(); toast('Borrado ✓','ok');
+  }
+  catch(e){ console.error(e); toast('Error al borrar: '+(e.message||e),'err'); }
 };
 
 /* config save */
