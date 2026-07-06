@@ -35,7 +35,11 @@ export async function updateSession(request: NextRequest) {
   // Protección de rutas: sin sesión, todo redirige a /login.
   // (El matcher de proxy.ts ya excluye /api y assets estáticos.)
   const path = request.nextUrl.pathname;
-  const isPublic = path === "/login" || path.startsWith("/auth");
+  const isPublic =
+    path === "/login" ||
+    path.startsWith("/auth") ||
+    path === "/privacy" ||
+    path.startsWith("/privacy/");
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
