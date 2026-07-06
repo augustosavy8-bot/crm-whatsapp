@@ -10,6 +10,10 @@ interface Props {
   contact: ConversationListItem;
   messages: Message[];
   loading: boolean;
+  windowOpen: boolean;
+  sending: boolean;
+  sendError: string | null;
+  onSend: (text: string) => Promise<boolean>;
   onBack?: () => void;
 }
 
@@ -17,6 +21,10 @@ export default function ChatWindow({
   contact,
   messages,
   loading,
+  windowOpen,
+  sending,
+  sendError,
+  onSend,
   onBack,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -44,7 +52,7 @@ export default function ChatWindow({
             .charAt(0)
             .toUpperCase()}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">
             {displayName(contact.name, contact.phone_number)}
           </div>
@@ -52,6 +60,17 @@ export default function ChatWindow({
             {contact.phone_number}
           </div>
         </div>
+        <span
+          className={[
+            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
+            windowOpen
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+              : "bg-neutral-200 text-neutral-500 dark:bg-neutral-800",
+          ].join(" ")}
+          title="Ventana de 24hs para responder con texto libre"
+        >
+          {windowOpen ? "Ventana 24h activa" : "Ventana cerrada"}
+        </span>
       </div>
 
       {/* Mensajes */}
@@ -68,7 +87,12 @@ export default function ChatWindow({
         <div ref={bottomRef} />
       </div>
 
-      <MessageComposer />
+      <MessageComposer
+        windowOpen={windowOpen}
+        sending={sending}
+        error={sendError}
+        onSend={onSend}
+      />
     </div>
   );
 }
