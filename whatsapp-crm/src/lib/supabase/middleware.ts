@@ -28,7 +28,20 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Importante: llamar getUser() para refrescar el token si hace falta.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Protección de rutas: sin sesión, todo redirige a /login.
+  // (El matcher de proxy.ts ya excluye /api y assets estáticos.)
+  const path = request.nextUrl.pathname;
+  const isPublic = path === "/login" || path.startsWith("/auth");
+  if (!user && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   return response;
 }

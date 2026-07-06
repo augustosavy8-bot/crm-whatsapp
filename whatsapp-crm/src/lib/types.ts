@@ -62,3 +62,11 @@ export interface Template {
   client_id: string | null;
   created_at: string;
 }
+
+// Fila de la vista `conversation_list`: un contacto + su último mensaje.
+export interface ConversationListItem extends Contact {
+  last_message_body: string | null;
+  last_message_type: string | null;
+  last_message_direction: MessageDirection | null;
+  last_message_created_at: string | null;
+}
