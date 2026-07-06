@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendText } from "@/lib/whatsapp/meta";
 import { isWindowOpen } from "@/lib/window";
+import { normalizeArPhone } from "@/lib/phone";
 
 // Envío de texto libre. A diferencia del webhook, ESTE endpoint requiere sesión.
 export const runtime = "nodejs";
@@ -59,8 +60,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 5) Enviar por la Cloud API
-  const result = await sendText(contact.phone_number as string, body);
+  // 5) Enviar por la Cloud API (normalizando el destino: AR sin el 9)
+  const to = normalizeArPhone(contact.phone_number as string);
+  const result = await sendText(to, body);
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error || "Falló el envío a WhatsApp" },
