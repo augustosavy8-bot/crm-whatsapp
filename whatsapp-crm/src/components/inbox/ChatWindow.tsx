@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import type { ConversationListItem, Message } from "@/lib/types";
-import { displayName } from "@/lib/format";
+import { contactLabel, contactSubtitle } from "@/lib/format";
+import { CHANNEL_META, type Channel } from "@/lib/channels";
 import MessageBubble from "./MessageBubble";
 import MessageComposer from "./MessageComposer";
 
@@ -47,17 +48,27 @@ export default function ChatWindow({
             ‹
           </button>
         )}
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700 text-sm font-medium text-neutral-600 dark:text-neutral-200">
-          {displayName(contact.name, contact.phone_number)
-            .charAt(0)
-            .toUpperCase()}
+        <div className="relative shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700 text-sm font-medium text-neutral-600 dark:text-neutral-200">
+            {contactLabel(contact).replace(/^@/, "").charAt(0).toUpperCase()}
+          </div>
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-neutral-900 ${CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"].dot}`}
+          />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">
-            {displayName(contact.name, contact.phone_number)}
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">
+              {contactLabel(contact)}
+            </span>
+            <span
+              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"].badge}`}
+            >
+              {CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"].label}
+            </span>
           </div>
           <div className="truncate text-xs text-neutral-500">
-            {contact.phone_number}
+            {contactSubtitle(contact)}
           </div>
         </div>
         <span

@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendText } from "@/lib/whatsapp/meta";
+import { sendMessengerText } from "@/lib/meta/send";
 import { isWindowOpen } from "@/lib/window";
 import { normalizeArPhone } from "@/lib/phone";
+import type { Channel } from "@/lib/channels";
 
-// Envío de texto libre. A diferencia del webhook, ESTE endpoint requiere sesión.
+// Envío de texto libre multicanal (WhatsApp / Instagram / Messenger).
+// Requiere sesión (a diferencia de los webhooks). Reemplaza a /api/whatsapp/send.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
   // 3) Contacto (respeta RLS con la sesión del agente)
   const { data: contact, error: contactErr } = await supabase
     .from("contacts")
-    .select("id, phone_number, last_inbound_at")
+    .select("id, channel, phone_number, external_id, last_inbound_at")
     .eq("id", contactId)
     .maybeSingle();
   if (contactErr) {
@@ -48,7 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Contacto no encontrado" }, { status: 404 });
   }
 
-  // 4) Ventana de 24hs (autoridad server-side)
+  // 4) Ventana de 24hs (autoridad server-side; aplica a los 3 canales)
   if (!isWindowOpen(contact.last_inbound_at as string | null)) {
     return NextResponse.json(
       {
@@ -60,14 +63,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 5) Enviar por la Cloud API (normalizando el destino: AR sin el 9)
-  const to = normalizeArPhone(contact.phone_number as string);
-  const result = await sendText(to, body);
-  if (!result.ok) {
-    return NextResponse.json(
-      { error: result.error || "Falló el envío a WhatsApp" },
-      { status: 502 },
-    );
+  // 5) Enviar por la API que corresponda según el canal.
+  const channel = (contact.channel as Channel) ?? "whatsapp";
+  let externalMessageId: string | null = null;
+
+  if (channel === "whatsapp") {
+    // --- Rama WhatsApp: EQUIVALENTE EXACTA al viejo /api/whatsapp/send ---
+    const to = normalizeArPhone(contact.phone_number as string | null);
+    const result = await sendText(to, body);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error || "Falló el envío a WhatsApp" },
+        { status: 502 },
+      );
+    }
+    externalMessageId = result.waMessageId;
+  } else {
+    // --- Rama Instagram / Messenger: Send API con el Page token ---
+    const recipient = contact.external_id as string | null;
+    if (!recipient) {
+      return NextResponse.json(
+        { error: "El contacto no tiene identificador de destino" },
+        { status: 400 },
+      );
+    }
+    const result = await sendMessengerText(recipient, body);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error || "Falló el envío" },
+        { status: 502 },
+      );
+    }
+    externalMessageId = result.messageId;
   }
 
   // 6) Persistir el saliente (+ reordenar la conversación)
@@ -81,7 +108,8 @@ export async function POST(request: NextRequest) {
     .from("messages")
     .insert({
       contact_id: contact.id,
-      wa_message_id: result.waMessageId,
+      channel,
+      wa_message_id: externalMessageId,
       direction: "outbound",
       type: "text",
       body,
@@ -92,7 +120,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (insertErr) {
-    // El mensaje SÍ se envió a WhatsApp; solo falló guardarlo.
+    // El mensaje SÍ se envió; solo falló guardarlo.
     console.error("[send] enviado pero no se pudo guardar", insertErr);
     return NextResponse.json({
       ok: true,

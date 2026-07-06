@@ -2,6 +2,7 @@
 
 export type ConversationStatus = "abierta" | "en_proceso" | "resuelta";
 export type MessageDirection = "inbound" | "outbound";
+export type Channel = "whatsapp" | "instagram" | "facebook";
 export type MessageStatus =
   | "queued"
   | "sent"
@@ -11,7 +12,10 @@ export type MessageStatus =
 
 export interface Contact {
   id: string;
-  phone_number: string;
+  channel: Channel;
+  phone_number: string | null;
+  external_id: string | null;
+  username: string | null;
   wa_id: string | null;
   name: string | null;
   tags: string[];
@@ -29,6 +33,7 @@ export interface Contact {
 export interface Message {
   id: string;
   contact_id: string;
+  channel: Channel;
   wa_message_id: string | null;
   direction: MessageDirection;
   type: string;

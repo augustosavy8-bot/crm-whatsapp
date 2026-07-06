@@ -1,9 +1,6 @@
 import type { ConversationListItem } from "@/lib/types";
-import {
-  displayName,
-  formatListTime,
-  messagePreview,
-} from "@/lib/format";
+import { contactLabel, formatListTime, messagePreview } from "@/lib/format";
+import { CHANNEL_META, type Channel } from "@/lib/channels";
 
 interface Props {
   conversations: ConversationListItem[];
@@ -43,13 +40,19 @@ export default function ConversationList({
                   : "hover:bg-neutral-50 dark:hover:bg-neutral-900",
               ].join(" ")}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700 text-sm font-medium text-neutral-600 dark:text-neutral-200">
-                {displayName(c.name, c.phone_number).charAt(0).toUpperCase()}
+              <div className="relative shrink-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700 text-sm font-medium text-neutral-600 dark:text-neutral-200">
+                  {contactLabel(c).replace(/^@/, "").charAt(0).toUpperCase()}
+                </div>
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-neutral-900 ${CHANNEL_META[(c.channel as Channel) ?? "whatsapp"].dot}`}
+                  title={CHANNEL_META[(c.channel as Channel) ?? "whatsapp"].label}
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-sm font-medium">
-                    {displayName(c.name, c.phone_number)}
+                    {contactLabel(c)}
                   </span>
                   <span className="shrink-0 text-[11px] text-neutral-400">
                     {formatListTime(c.last_message_at)}

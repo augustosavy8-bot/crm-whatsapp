@@ -9,6 +9,7 @@ import {
 } from "@/lib/conversations";
 import type { ConversationListItem, Message } from "@/lib/types";
 import { isWindowOpen } from "@/lib/window";
+import { CHANNELS, CHANNEL_META, type Channel } from "@/lib/channels";
 import ConversationList from "./ConversationList";
 import ChatWindow from "./ChatWindow";
 import { useRealtimeInbox } from "./useRealtimeInbox";
@@ -27,6 +28,7 @@ export default function InboxClient({
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Channel | "all">("all");
 
   // Agrega un mensaje evitando duplicados por id (mismo dedupe que usa Realtime).
   const appendMessage = useCallback((msg: Message) => {
@@ -83,7 +85,7 @@ export default function InboxClient({
       setSending(true);
       setSendError(null);
       try {
-        const res = await fetch("/api/whatsapp/send", {
+        const res = await fetch("/api/messages/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contactId: selectedId, body: text }),
@@ -127,6 +129,16 @@ export default function InboxClient({
     conversations.find((c) => c.id === selectedId) ?? null;
   const windowOpen = isWindowOpen(selectedContact?.last_inbound_at ?? null);
 
+  // Filtro por canal (tab). Cuenta por canal para los badges de las tabs.
+  const visibleConversations =
+    tab === "all"
+      ? conversations
+      : conversations.filter((c) => c.channel === tab);
+  const countFor = (ch: Channel | "all") =>
+    ch === "all"
+      ? conversations.length
+      : conversations.filter((c) => c.channel === ch).length;
+
   return (
     <div className="flex h-full">
       {/* Columna izquierda: lista */}
@@ -139,9 +151,36 @@ export default function InboxClient({
         <div className="shrink-0 border-b border-neutral-200 dark:border-neutral-800 px-4 py-2.5 text-sm font-semibold">
           Conversaciones
         </div>
+        {/* Tabs por canal */}
+        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-neutral-200 dark:border-neutral-800 px-2 py-2">
+          {(["all", ...CHANNELS] as const).map((ch) => {
+            const active = tab === ch;
+            const label = ch === "all" ? "Todos" : CHANNEL_META[ch].label;
+            return (
+              <button
+                key={ch}
+                onClick={() => setTab(ch)}
+                className={[
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  active
+                    ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                    : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800",
+                ].join(" ")}
+              >
+                {ch !== "all" && (
+                  <span
+                    className={`h-2 w-2 rounded-full ${CHANNEL_META[ch].dot}`}
+                  />
+                )}
+                {label}
+                <span className="opacity-60">{countFor(ch)}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <ConversationList
-            conversations={conversations}
+            conversations={visibleConversations}
             selectedId={selectedId}
             onSelect={openConversation}
           />

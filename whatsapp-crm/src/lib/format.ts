@@ -52,3 +52,28 @@ export function displayName(
 ): string {
   return (name && name.trim()) || phone || "Sin número";
 }
+
+// Etiqueta de un contacto que puede NO tener teléfono (IG/Messenger):
+// nombre → @username → teléfono → @id-corto → fallback.
+export function contactLabel(c: {
+  name: string | null;
+  username: string | null;
+  phone_number: string | null;
+  external_id: string | null;
+}): string {
+  if (c.name && c.name.trim()) return c.name;
+  if (c.username && c.username.trim()) return "@" + c.username.trim();
+  if (c.phone_number && c.phone_number.trim()) return c.phone_number;
+  if (c.external_id) return "@" + c.external_id.slice(-8);
+  return "Sin identificar";
+}
+
+// Subtítulo del contacto: teléfono si tiene, si no el @username.
+export function contactSubtitle(c: {
+  username: string | null;
+  phone_number: string | null;
+}): string {
+  if (c.phone_number && c.phone_number.trim()) return c.phone_number;
+  if (c.username && c.username.trim()) return "@" + c.username.trim();
+  return "";
+}
