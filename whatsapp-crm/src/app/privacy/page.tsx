@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "6 de julio de 2026";
-const CONTACT_EMAIL = "tu-email@ejemplo.com"; // TODO: reemplazar por tu email real
+const CONTACT_EMAIL = "augustosavy8@gmail.com"; // TODO: reemplazar por tu email real
 
 export default function PrivacyPage() {
   return (
