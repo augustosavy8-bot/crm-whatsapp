@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/SignOutButton";
+import HeaderNav from "@/components/HeaderNav";
 
 // Shell protegido: sin sesión no se entra (además del proxy, por las dudas).
 export default async function AppLayout({
@@ -33,10 +34,13 @@ export default async function AppLayout({
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
             F
           </div>
-          <span className="text-sm font-bold tracking-tight">WhatsApp CRM</span>
+          <span className="hidden text-sm font-bold tracking-tight sm:block">
+            WhatsApp CRM
+          </span>
         </div>
+        <HeaderNav />
         <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-muted sm:block">
+          <span className="hidden text-xs text-muted md:block">
             {user.email}
           </span>
           <SignOutButton />

@@ -75,3 +75,19 @@ export interface ConversationListItem extends Contact {
   last_message_direction: MessageDirection | null;
   last_message_created_at: string | null;
 }
+
+// Vista `channel_stats`: resumen por canal (dashboard).
+export interface ChannelStat {
+  channel: Channel;
+  total_conversations: number;
+  open_conversations: number;
+  unread_total: number;
+  inbound_24h: number;
+}
+
+// Vista `messages_daily`: entrantes por día y canal (dashboard).
+export interface MessagesDaily {
+  day: string; // date (YYYY-MM-DD)
+  channel: Channel;
+  inbound: number;
+}

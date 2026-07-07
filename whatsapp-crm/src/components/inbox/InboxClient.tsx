@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getConversations,
@@ -18,8 +18,10 @@ import { useMobileVisualViewport } from "./useMobileViewportHeight";
 
 export default function InboxClient({
   initialConversations,
+  initialSelectedId = null,
 }: {
   initialConversations: ConversationListItem[];
+  initialSelectedId?: string | null;
 }) {
   const supabase = useRef(createClient()).current;
 
@@ -81,6 +83,14 @@ export default function InboxClient({
     },
     [supabase],
   );
+
+  // Deep-link ?c=<id>: abrir esa conversación una sola vez al montar.
+  const didInit = useRef(false);
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    if (initialSelectedId) openConversation(initialSelectedId);
+  }, [initialSelectedId, openConversation]);
 
   // Enviar texto libre. Devuelve true si el envío fue exitoso (para limpiar el input).
   const sendMessage = useCallback(
