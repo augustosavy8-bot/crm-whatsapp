@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const result = await sendMessengerText(recipient, body);
+    const result = await sendMessengerText(channel, recipient, body);
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error || "Falló el envío" },
