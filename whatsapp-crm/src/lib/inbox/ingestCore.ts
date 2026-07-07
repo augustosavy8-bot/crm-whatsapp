@@ -45,6 +45,19 @@ export async function ingestMessenger(
       unread = (existing.unread_count as number | null) ?? 0;
       name = (existing.name as string | null) ?? null;
       username = (existing.username as string | null) ?? null;
+      // Backfill: si el contacto todavía no tiene nombre/username, reintentar el
+      // perfil (p. ej. contactos creados antes del fix de graph.instagram.com).
+      if (!name && !username) {
+        const profile = await fetchProfile(channel, m.externalId);
+        if (profile.name || profile.username) {
+          name = profile.name;
+          username = profile.username;
+          await sb
+            .from("contacts")
+            .update({ name, username })
+            .eq("id", contactId);
+        }
+      }
     } else {
       // Contacto nuevo: intentar traer nombre/username (best-effort).
       const profile = await fetchProfile(channel, m.externalId);
