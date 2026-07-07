@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/SignOutButton";
 import HeaderNav from "@/components/HeaderNav";
+import NotificationsProvider from "@/components/notifications/NotificationsProvider";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 // Shell protegido: sin sesión no se entra (además del proxy, por las dudas).
 export default async function AppLayout({
@@ -16,6 +18,7 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   return (
+    <NotificationsProvider>
     <div className="flex h-[100dvh] flex-col bg-canvas">
       {/* Gradiente de marca de Instagram, referenciado por ChannelIcon (#ig-grad). */}
       <svg width="0" height="0" className="absolute" aria-hidden="true">
@@ -39,14 +42,16 @@ export default async function AppLayout({
           </span>
         </div>
         <HeaderNav />
-        <div className="flex items-center gap-3">
-          <span className="hidden text-xs text-muted md:block">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="hidden text-xs text-muted lg:block">
             {user.email}
           </span>
+          <NotificationBell />
           <SignOutButton />
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
     </div>
+    </NotificationsProvider>
   );
 }
