@@ -31,17 +31,11 @@ export async function fetchProfile(
   const url = `https://${host}/${GRAPH_VERSION}/${id}?fields=${fields}&access_token=${token}`;
   try {
     const res = await fetch(url);
-    // LOG TEMPORAL (diagnóstico): respuesta CRUDA de Meta (status + body).
-    // No loguea la URL (que lleva el token). Quitar cuando se confirme el perfil.
-    const raw = await res.text();
-    console.log(`[profile] ${channel} ${id} -> HTTP ${res.status}: ${raw}`);
-
-    if (!res.ok) return { name: null, username: null };
-
-    let data: Record<string, unknown> = {};
-    try {
-      data = JSON.parse(raw);
-    } catch {}
+    const data = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) {
+      console.warn(`[profile] ${channel} ${id} -> HTTP ${res.status}`);
+      return { name: null, username: null };
+    }
     return {
       name: (data.name as string) ?? null,
       username: (data.username as string) ?? null,
