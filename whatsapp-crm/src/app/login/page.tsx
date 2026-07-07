@@ -54,43 +54,43 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950 p-6">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-canvas p-6">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-semibold">
-            W
+        <div className="mb-6 flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-base font-bold text-white">
+            F
           </div>
           <div>
-            <h1 className="text-lg font-semibold leading-tight">WhatsApp CRM</h1>
-            <p className="text-xs text-neutral-500">Panel interno</p>
+            <h1 className="text-lg font-bold leading-tight tracking-tight">
+              WhatsApp CRM
+            </h1>
+            <p className="text-xs text-muted">Panel interno</p>
           </div>
         </div>
 
         <form
           onSubmit={onSubmit}
-          className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-4 shadow-sm"
+          className="space-y-4 rounded-panel border border-line bg-surface p-6 shadow-card"
         >
-          <h2 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+          <h2 className="text-[15px] font-semibold">
             {mode === "login" ? "Iniciar sesión" : "Crear usuario"}
           </h2>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
-              Email
-            </label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted">Email</label>
             <input
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
               placeholder="vos@ejemplo.com"
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted">
               Contraseña
             </label>
             <input
@@ -101,24 +101,18 @@ export default function LoginPage() {
               }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
               placeholder="••••••••"
             />
           </div>
 
-          {error && (
-            <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-          )}
-          {notice && (
-            <p className="text-xs text-emerald-700 dark:text-emerald-400">
-              {notice}
-            </p>
-          )}
+          {error && <p className="text-[13px] text-danger">{error}</p>}
+          {notice && <p className="text-[13px] text-ok">{notice}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="w-full rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:opacity-60"
           >
             {loading
               ? "Procesando…"
@@ -134,7 +128,7 @@ export default function LoginPage() {
               setError(null);
               setNotice(null);
             }}
-            className="w-full text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+            className="w-full text-xs font-medium text-muted hover:text-ink"
           >
             {mode === "login"
               ? "¿No tenés usuario? Crear uno"

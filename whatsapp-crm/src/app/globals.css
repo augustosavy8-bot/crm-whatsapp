@@ -1,37 +1,67 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   Sistema de diseño del CRM (referencia: dashboard financiero).
+   Canvas gris cálido, cards blancas, acento coral, primarios ink.
+   Los tokens de @theme generan utilidades: bg-canvas, text-ink,
+   bg-accent, border-line, rounded-card, shadow-card, etc.
+   ============================================================ */
+@theme {
+  --color-canvas: #f1f0ed; /* fondo de página */
+  --color-surface: #ffffff; /* cards / paneles */
+  --color-surface-2: #f7f6f3; /* filas alternas / inputs */
+  --color-ink: #1b1a18; /* texto principal / primario */
+  --color-muted: #8c8880; /* texto secundario */
+  --color-faint: #b7b3ac; /* placeholders / iconos apagados */
+  --color-line: #e9e6e1; /* bordes */
+  --color-accent: #f0552d; /* coral — acento puntual */
+  --color-accent-soft: #fce9e2; /* tinte del acento */
+  --color-ok: #2fae6b; /* resuelta */
+  --color-warn: #f59e0b; /* en proceso */
+  --color-danger: #ef4444; /* abierta / pendiente */
+
+  /* puntitos de canal */
+  --color-ch-whatsapp: #2fae6b;
+  --color-ch-instagram: #e1306c;
+  --color-ch-facebook: #2d6cf0;
+
+  --radius-card: 18px;
+  --radius-panel: 24px;
+
+  --shadow-sm: 0 1px 2px rgba(27, 26, 24, 0.05);
+  --shadow-card: 0 1px 3px rgba(27, 26, 24, 0.04),
+    0 10px 30px -16px rgba(27, 26, 24, 0.14);
+  --shadow-pop: 0 12px 34px -10px rgba(27, 26, 24, 0.2);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  /* Elimina el zoom por doble-tap en mobile. */
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  /* Elimina el zoom por doble-tap en mobile (PWA). */
   touch-action: manipulation;
 }
 
 /* Safari iOS hace auto-zoom al enfocar inputs con font-size < 16px.
-   Forzamos 16px mínimo en controles para evitarlo (las clases text-sm de
-   Tailwind bajan a 14px). */
+   Forzamos 16px mínimo en controles (sin layer, gana sobre text-sm). */
 input,
 textarea,
 select {
   font-size: 16px;
+}
+
+/* Foco visible y accesible en toda la UI. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

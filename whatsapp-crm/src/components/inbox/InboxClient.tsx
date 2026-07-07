@@ -13,6 +13,7 @@ import { CHANNELS, CHANNEL_META, type Channel } from "@/lib/channels";
 import ConversationList from "./ConversationList";
 import ChatWindow from "./ChatWindow";
 import { useRealtimeInbox } from "./useRealtimeInbox";
+import { useMobileViewportHeight } from "./useMobileViewportHeight";
 
 export default function InboxClient({
   initialConversations,
@@ -29,6 +30,8 @@ export default function InboxClient({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [tab, setTab] = useState<Channel | "all">("all");
+  // Altura del viewport visible en mobile (para el chat full-screen con teclado).
+  const mobileH = useMobileViewportHeight();
 
   // Agrega un mensaje evitando duplicados por id (mismo dedupe que usa Realtime).
   const appendMessage = useCallback((msg: Message) => {
@@ -145,40 +148,38 @@ export default function InboxClient({
       <aside
         className={[
           selectedId ? "hidden md:flex" : "flex",
-          "w-full md:w-[360px] shrink-0 flex-col border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900",
+          "w-full shrink-0 flex-col border-r border-line bg-surface md:w-[380px]",
         ].join(" ")}
       >
-        <div className="shrink-0 border-b border-neutral-200 dark:border-neutral-800 px-4 py-2.5 text-sm font-semibold">
+        <div className="shrink-0 px-4 pt-4 pb-2 text-lg font-bold tracking-tight">
           Conversaciones
         </div>
         {/* Tabs por canal */}
-        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-neutral-200 dark:border-neutral-800 px-2 py-2">
-          {(["all", ...CHANNELS] as const).map((ch) => {
-            const active = tab === ch;
-            const label = ch === "all" ? "Todos" : CHANNEL_META[ch].label;
+        <div className="flex shrink-0 gap-1 overflow-x-auto px-3 pb-3">
+          {(["all", ...CHANNELS] as const).map((c) => {
+            const active = tab === c;
+            const label = c === "all" ? "Todos" : CHANNEL_META[c].label;
             return (
               <button
-                key={ch}
-                onClick={() => setTab(ch)}
+                key={c}
+                onClick={() => setTab(c)}
                 className={[
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors",
                   active
-                    ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                    : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800",
+                    ? "bg-ink text-white"
+                    : "text-muted hover:bg-surface-2",
                 ].join(" ")}
               >
-                {ch !== "all" && (
-                  <span
-                    className={`h-2 w-2 rounded-full ${CHANNEL_META[ch].dot}`}
-                  />
+                {c !== "all" && (
+                  <span className={`h-2 w-2 rounded-full ${CHANNEL_META[c].dot}`} />
                 )}
                 {label}
-                <span className="opacity-60">{countFor(ch)}</span>
+                <span className="opacity-60 tabular-nums">{countFor(c)}</span>
               </button>
             );
           })}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto border-t border-line">
           <ConversationList
             conversations={visibleConversations}
             selectedId={selectedId}
@@ -187,11 +188,15 @@ export default function InboxClient({
         </div>
       </aside>
 
-      {/* Columna derecha: chat */}
+      {/* Columna derecha: chat. En mobile es overlay full-screen (fixed) con
+          altura = viewport visible, así el composer queda arriba del teclado. */}
       <section
+        style={mobileH ? { height: `${mobileH}px` } : undefined}
         className={[
-          selectedId ? "flex" : "hidden md:flex",
-          "min-w-0 flex-1 flex-col",
+          "min-w-0 flex-col md:flex-1",
+          selectedId
+            ? "fixed inset-x-0 top-0 z-50 flex h-[100dvh] md:static md:z-auto md:h-full md:flex"
+            : "hidden md:flex",
         ].join(" ")}
       >
         {selectedContact ? (
@@ -206,7 +211,7 @@ export default function InboxClient({
             onBack={() => setSelectedId(null)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-neutral-100 dark:bg-neutral-950 text-sm text-neutral-400">
+          <div className="flex h-full items-center justify-center bg-canvas text-sm text-muted">
             Elegí una conversación para verla.
           </div>
         )}

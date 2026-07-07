@@ -11,12 +11,12 @@ const CONTACT_EMAIL = "augustosavy8@gmail.com"; // TODO: reemplazar por tu email
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-neutral-50 dark:bg-neutral-950 px-5 py-12">
+    <main className="min-h-screen bg-canvas px-5 py-12">
       <article className="mx-auto max-w-2xl">
-        <header className="mb-8 border-b border-neutral-200 dark:border-neutral-800 pb-6">
+        <header className="mb-8 border-b border-line pb-6">
           <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-sm font-semibold text-white">
-              W
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
+              F
             </div>
             <span className="text-sm font-semibold">WhatsApp CRM</span>
           </div>
@@ -135,7 +135,7 @@ export default function PrivacyPage() {
               de tus datos, escribinos a{" "}
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
-                className="font-medium text-emerald-700 underline dark:text-emerald-400"
+                className="font-medium text-accent underline"
               >
                 {CONTACT_EMAIL}
               </a>

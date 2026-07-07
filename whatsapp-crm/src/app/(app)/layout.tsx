@@ -15,16 +15,16 @@ export default async function AppLayout({
   if (!user) redirect("/login");
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex shrink-0 items-center justify-between border-b border-neutral-200 dark:border-neutral-800 px-4 py-2.5">
+    <div className="flex h-[100dvh] flex-col bg-canvas">
+      <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-md bg-emerald-600 flex items-center justify-center text-white text-xs font-semibold">
-            W
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
+            F
           </div>
-          <span className="text-sm font-semibold">WhatsApp CRM</span>
+          <span className="text-sm font-bold tracking-tight">WhatsApp CRM</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="hidden sm:block text-xs text-neutral-500">
+          <span className="hidden text-xs text-muted sm:block">
             {user.email}
           </span>
           <SignOutButton />

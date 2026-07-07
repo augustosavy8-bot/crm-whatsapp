@@ -8,6 +8,7 @@ interface Props {
   error: string | null;
   // Devuelve true si el envío fue exitoso (para limpiar el input).
   onSend: (text: string) => Promise<boolean>;
+  onFocus?: () => void;
 }
 
 // Composer de texto libre. Habilitado solo dentro de la ventana de 24hs.
@@ -16,6 +17,7 @@ export default function MessageComposer({
   sending,
   error,
   onSend,
+  onFocus,
 }: Props) {
   const [text, setText] = useState("");
 
@@ -33,10 +35,14 @@ export default function MessageComposer({
     }
   }
 
+  // Padding inferior extra para el safe-area del notch/home indicator.
+  const shell =
+    "shrink-0 border-t border-line bg-surface px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]";
+
   if (!windowOpen) {
     return (
-      <div className="shrink-0 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-3">
-        <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+      <div className={shell}>
+        <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[13px] text-warn">
           Pasaron más de 24hs desde el último mensaje del contacto. Para reabrir
           la conversación necesitás enviar una plantilla (llega en una fase
           próxima).
@@ -46,25 +52,41 @@ export default function MessageComposer({
   }
 
   return (
-    <div className="shrink-0 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-3">
-      {error && (
-        <p className="mb-2 text-xs text-red-600 dark:text-red-400">{error}</p>
-      )}
+    <div className={shell}>
+      {error && <p className="mb-2 text-[13px] text-danger">{error}</p>}
       <div className="flex items-center gap-2">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
+          onFocus={onFocus}
           disabled={sending}
           placeholder="Escribí un mensaje…"
-          className="flex-1 rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-full border border-line bg-surface-2 px-4 py-2.5 text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
         />
         <button
           onClick={submit}
           disabled={sending || !text.trim()}
-          className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          aria-label="Enviar"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
         >
-          {sending ? "Enviando…" : "Enviar"}
+          {sending ? (
+            <span className="text-xs">…</span>
+          ) : (
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m22 2-7 20-4-9-9-4Z" />
+              <path d="M22 2 11 13" />
+            </svg>
+          )}
         </button>
       </div>
     </div>

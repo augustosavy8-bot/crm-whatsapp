@@ -14,18 +14,18 @@ interface ChannelMeta {
 export const CHANNEL_META: Record<Channel, ChannelMeta> = {
   whatsapp: {
     label: "WhatsApp",
-    dot: "bg-emerald-500",
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    dot: "bg-ch-whatsapp",
+    badge: "bg-ch-whatsapp/10 text-ch-whatsapp",
   },
   instagram: {
     label: "Instagram",
-    dot: "bg-pink-500",
-    badge: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
+    dot: "bg-ch-instagram",
+    badge: "bg-ch-instagram/10 text-ch-instagram",
   },
   facebook: {
     label: "Messenger",
-    dot: "bg-blue-500",
-    badge: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    dot: "bg-ch-facebook",
+    badge: "bg-ch-facebook/10 text-ch-facebook",
   },
 };
 

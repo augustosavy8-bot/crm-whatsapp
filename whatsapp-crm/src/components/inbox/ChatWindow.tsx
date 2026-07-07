@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ConversationListItem, Message } from "@/lib/types";
 import { contactLabel, contactSubtitle } from "@/lib/format";
 import { CHANNEL_META, type Channel } from "@/lib/channels";
@@ -29,67 +29,94 @@ export default function ChatWindow({
   onBack,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const ch = CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"];
 
-  // Autoscroll al fondo al abrir el chat y cuando cambian los mensajes.
+  const scrollToBottom = useCallback((smooth = false) => {
+    bottomRef.current?.scrollIntoView({
+      block: "end",
+      behavior: smooth ? "smooth" : "auto",
+    });
+  }, []);
+
+  // Autoscroll al abrir y al llegar mensajes.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [contact.id, messages.length]);
+    scrollToBottom();
+  }, [contact.id, messages.length, scrollToBottom]);
+
+  // Al cambiar el viewport visible (teclado en mobile), mantener el fondo a la vista.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => scrollToBottom();
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, [scrollToBottom]);
 
   return (
-    <div className="flex h-full flex-col bg-neutral-100 dark:bg-neutral-950">
+    <div className="flex h-full flex-col bg-canvas">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-2.5">
+      <div className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2.5 sm:px-4">
         {onBack && (
           <button
             onClick={onBack}
-            className="md:hidden -ml-1 rounded-md p-1 text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-            aria-label="Volver"
+            className="-ml-1 flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-surface-2 md:hidden"
+            aria-label="Volver a la lista"
           >
-            ‹
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
           </button>
         )}
         <div className="relative shrink-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700 text-sm font-medium text-neutral-600 dark:text-neutral-200">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface-2 text-sm font-semibold text-muted">
             {contactLabel(contact).replace(/^@/, "").charAt(0).toUpperCase()}
           </div>
           <span
-            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white dark:border-neutral-900 ${CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"].dot}`}
+            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface ${ch.dot}`}
           />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">
+            <span className="truncate text-[15px] font-semibold">
               {contactLabel(contact)}
             </span>
             <span
-              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"].badge}`}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${ch.badge}`}
             >
-              {CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"].label}
+              <span className={`h-1.5 w-1.5 rounded-full ${ch.dot}`} />
+              {ch.label}
             </span>
           </div>
-          <div className="truncate text-xs text-neutral-500">
+          <div className="truncate text-xs text-muted">
             {contactSubtitle(contact)}
           </div>
         </div>
         <span
           className={[
-            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-            windowOpen
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-              : "bg-neutral-200 text-neutral-500 dark:bg-neutral-800",
+            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium",
+            windowOpen ? "bg-ok/10 text-ok" : "bg-surface-2 text-muted",
           ].join(" ")}
           title="Ventana de 24hs para responder con texto libre"
         >
-          {windowOpen ? "Ventana 24h activa" : "Ventana cerrada"}
+          {windowOpen ? "Ventana 24h" : "Cerrada"}
         </span>
       </div>
 
       {/* Mensajes */}
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-4 sm:px-4">
         {loading ? (
-          <p className="text-center text-xs text-neutral-400">Cargando…</p>
+          <p className="text-center text-xs text-faint">Cargando…</p>
         ) : messages.length === 0 ? (
-          <p className="text-center text-xs text-neutral-400">
+          <p className="text-center text-xs text-faint">
             Sin mensajes en esta conversación.
           </p>
         ) : (
@@ -103,6 +130,7 @@ export default function ChatWindow({
         sending={sending}
         error={sendError}
         onSend={onSend}
+        onFocus={() => setTimeout(() => scrollToBottom(true), 300)}
       />
     </div>
   );
