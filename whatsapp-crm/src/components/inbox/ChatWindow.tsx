@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { ConversationListItem, Message } from "@/lib/types";
 import { contactLabel, contactSubtitle } from "@/lib/format";
-import { CHANNEL_META, type Channel } from "@/lib/channels";
+import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
+import ChannelIcon from "@/components/ChannelIcon";
 import MessageBubble from "./MessageBubble";
 import MessageComposer from "./MessageComposer";
 
@@ -29,7 +30,7 @@ export default function ChatWindow({
   onBack,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const ch = CHANNEL_META[(contact.channel as Channel) ?? "whatsapp"];
+  const channel = (contact.channel as Channel) ?? "whatsapp";
 
   const scrollToBottom = useCallback((smooth = false) => {
     bottomRef.current?.scrollIntoView({
@@ -80,24 +81,19 @@ export default function ChatWindow({
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface-2 text-sm font-semibold text-muted">
             {contactLabel(contact).replace(/^@/, "").charAt(0).toUpperCase()}
           </div>
-          <span
-            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface ${ch.dot}`}
-          />
+          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-surface bg-surface">
+            <ChannelIcon channel={channel} size={10} />
+          </span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span className="truncate text-[15px] font-semibold">
               {contactLabel(contact)}
             </span>
-            <span
-              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${ch.badge}`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${ch.dot}`} />
-              {ch.label}
-            </span>
+            <ChannelIcon channel={channel} size={15} />
           </div>
           <div className="truncate text-xs text-muted">
-            {contactSubtitle(contact)}
+            {contactSubtitle(contact) || CHANNEL_LABEL[channel]}
           </div>
         </div>
         <span

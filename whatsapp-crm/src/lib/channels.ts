@@ -3,32 +3,19 @@ export type Channel = "whatsapp" | "instagram" | "facebook";
 
 export const CHANNELS: Channel[] = ["whatsapp", "instagram", "facebook"];
 
-interface ChannelMeta {
-  label: string;
-  // Punto de color para el indicador chico (clases Tailwind).
-  dot: string;
-  // Chip/badge (fondo + texto).
-  badge: string;
-}
+export const CHANNEL_LABEL: Record<Channel, string> = {
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  facebook: "Messenger",
+};
 
-export const CHANNEL_META: Record<Channel, ChannelMeta> = {
-  whatsapp: {
-    label: "WhatsApp",
-    dot: "bg-ch-whatsapp",
-    badge: "bg-ch-whatsapp/10 text-ch-whatsapp",
-  },
-  instagram: {
-    label: "Instagram",
-    dot: "bg-ch-instagram",
-    badge: "bg-ch-instagram/10 text-ch-instagram",
-  },
-  facebook: {
-    label: "Messenger",
-    dot: "bg-ch-facebook",
-    badge: "bg-ch-facebook/10 text-ch-facebook",
-  },
+// Colores de marca (para los íconos de canal; el gradiente de IG se resuelve en ChannelIcon).
+export const CHANNEL_BRAND: Record<Channel, string> = {
+  whatsapp: "#25D366",
+  instagram: "#E1306C",
+  facebook: "#0866FF",
 };
 
 export function channelLabel(channel: string | null | undefined): string {
-  return CHANNEL_META[(channel as Channel) ?? "whatsapp"]?.label ?? "—";
+  return CHANNEL_LABEL[(channel as Channel) ?? "whatsapp"] ?? "—";
 }

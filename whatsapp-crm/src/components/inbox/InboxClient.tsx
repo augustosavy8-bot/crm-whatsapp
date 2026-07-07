@@ -9,7 +9,8 @@ import {
 } from "@/lib/conversations";
 import type { ConversationListItem, Message } from "@/lib/types";
 import { isWindowOpen } from "@/lib/window";
-import { CHANNELS, CHANNEL_META, type Channel } from "@/lib/channels";
+import { CHANNELS, CHANNEL_LABEL, type Channel } from "@/lib/channels";
+import ChannelIcon from "@/components/ChannelIcon";
 import ConversationList from "./ConversationList";
 import ChatWindow from "./ChatWindow";
 import { useRealtimeInbox } from "./useRealtimeInbox";
@@ -158,7 +159,7 @@ export default function InboxClient({
         <div className="flex shrink-0 gap-1 overflow-x-auto px-3 pb-3">
           {(["all", ...CHANNELS] as const).map((c) => {
             const active = tab === c;
-            const label = c === "all" ? "Todos" : CHANNEL_META[c].label;
+            const label = c === "all" ? "Todos" : CHANNEL_LABEL[c];
             return (
               <button
                 key={c}
@@ -170,9 +171,7 @@ export default function InboxClient({
                     : "text-muted hover:bg-surface-2",
                 ].join(" ")}
               >
-                {c !== "all" && (
-                  <span className={`h-2 w-2 rounded-full ${CHANNEL_META[c].dot}`} />
-                )}
+                {c !== "all" && <ChannelIcon channel={c} size={14} />}
                 {label}
                 <span className="opacity-60 tabular-nums">{countFor(c)}</span>
               </button>
