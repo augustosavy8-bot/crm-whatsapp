@@ -13,7 +13,7 @@ import { CHANNELS, CHANNEL_META, type Channel } from "@/lib/channels";
 import ConversationList from "./ConversationList";
 import ChatWindow from "./ChatWindow";
 import { useRealtimeInbox } from "./useRealtimeInbox";
-import { useMobileViewportHeight } from "./useMobileViewportHeight";
+import { useMobileVisualViewport } from "./useMobileViewportHeight";
 
 export default function InboxClient({
   initialConversations,
@@ -30,8 +30,8 @@ export default function InboxClient({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [tab, setTab] = useState<Channel | "all">("all");
-  // Altura del viewport visible en mobile (para el chat full-screen con teclado).
-  const mobileH = useMobileViewportHeight();
+  // Viewport visible en mobile (para el chat full-screen con teclado).
+  const vp = useMobileVisualViewport();
 
   // Agrega un mensaje evitando duplicados por id (mismo dedupe que usa Realtime).
   const appendMessage = useCallback((msg: Message) => {
@@ -188,10 +188,21 @@ export default function InboxClient({
         </div>
       </aside>
 
-      {/* Columna derecha: chat. En mobile es overlay full-screen (fixed) con
-          altura = viewport visible, así el composer queda arriba del teclado. */}
+      {/* Columna derecha: chat. En mobile es overlay full-screen (fixed) anclado
+          al viewport VISIBLE (top=offsetTop, height=height del visualViewport),
+          así el composer queda pegado arriba del teclado sin hueco gris (iOS). */}
       <section
-        style={mobileH ? { height: `${mobileH}px` } : undefined}
+        style={
+          vp && selectedId
+            ? {
+                position: "fixed",
+                left: 0,
+                right: 0,
+                top: `${vp.offsetTop}px`,
+                height: `${vp.height}px`,
+              }
+            : undefined
+        }
         className={[
           "min-w-0 flex-col md:flex-1",
           selectedId
