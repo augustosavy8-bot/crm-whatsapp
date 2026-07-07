@@ -1,15 +1,28 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ParsedWebhook } from "./parseWebhook";
+import { messagePreview } from "@/lib/format";
+
+export interface IngestNotification {
+  contactId: string;
+  title: string;
+  body: string;
+}
 
 // Persiste lo que llega del webhook usando el cliente service-role (saltea RLS).
-// Devuelve un resumen para loguear/diagnosticar.
+// Devuelve un resumen para loguear/diagnosticar + las notificaciones a pushear.
 export async function ingestWebhook(
   sb: SupabaseClient,
   parsed: ParsedWebhook,
-): Promise<{ inbound: number; statusUpdates: number; skipped: number }> {
+): Promise<{
+  inbound: number;
+  statusUpdates: number;
+  skipped: number;
+  notifications: IngestNotification[];
+}> {
   let inbound = 0;
   let skipped = 0;
   let statusUpdates = 0;
+  const notifications: IngestNotification[] = [];
 
   // --- mensajes entrantes ---
   for (const m of parsed.messages) {
@@ -77,6 +90,11 @@ export async function ingestWebhook(
       continue;
     }
     inbound++;
+    notifications.push({
+      contactId,
+      title: (m.name && m.name.trim()) || m.from,
+      body: messagePreview(m.type, m.body) || "Nuevo mensaje",
+    });
 
     // actualizar contacto: nombre (si faltaba), timestamps y no leídos
     const patch: Record<string, unknown> = {
@@ -102,5 +120,5 @@ export async function ingestWebhook(
     if (!error) statusUpdates++;
   }
 
-  return { inbound, statusUpdates, skipped };
+  return { inbound, statusUpdates, skipped, notifications };
 }

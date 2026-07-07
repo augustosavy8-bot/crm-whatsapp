@@ -15,6 +15,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "WhatsApp CRM",
   description: "Inbox interno de WhatsApp Business",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "WhatsApp CRM",
+    statusBarStyle: "default",
+  },
 };
 
 // Evita zooms accidentales en mobile/PWA (se siente como app nativa).
@@ -27,6 +37,7 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
+  themeColor: "#F0552D",
 };
 
 export default function RootLayout({

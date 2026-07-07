@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { verifyMetaSignature } from "@/lib/whatsapp/verifySignature";
 import { parseMessenger } from "@/lib/meta/parseMessenger";
 import { ingestMessenger } from "@/lib/inbox/ingestCore";
+import { sendPushToAgents } from "@/lib/push/send";
 
 // Webhook de la Messenger Platform (Facebook Messenger + Instagram DMs).
 // Separado del de WhatsApp para no tocar el flujo de producción.
@@ -57,7 +58,23 @@ export async function POST(request: NextRequest) {
     if (parsed.messages.length) {
       const sb = createServiceClient();
       const summary = await ingestMessenger(sb, parsed);
-      console.log("[meta] ingest", summary);
+      console.log("[meta] ingest", {
+        inbound: summary.inbound,
+        skipped: summary.skipped,
+      });
+      // Push aditivo: NUNCA debe afectar la respuesta 200 del webhook.
+      try {
+        for (const n of summary.notifications) {
+          await sendPushToAgents({
+            title: n.title,
+            body: n.body,
+            url: `/inbox?c=${n.contactId}`,
+            tag: `foko-${n.contactId}`,
+          });
+        }
+      } catch (e) {
+        console.error("[meta] push falló (ignorado)", e);
+      }
     }
   } catch (e) {
     console.error("[meta] error procesando webhook", e);

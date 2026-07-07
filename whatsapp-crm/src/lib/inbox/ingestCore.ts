@@ -2,15 +2,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Channel } from "@/lib/channels";
 import { fetchProfile } from "@/lib/meta/profile";
 import type { ParsedMessengerWebhook } from "@/lib/meta/parseMessenger";
+import type { IngestNotification } from "@/lib/whatsapp/ingest";
+import { contactLabel, messagePreview } from "@/lib/format";
 
 // Ingest genérico por (channel, external_id) para Messenger/Instagram.
 // NO toca el ingest de WhatsApp (lib/whatsapp/ingest.ts). Escribe con service-role.
 export async function ingestMessenger(
   sb: SupabaseClient,
   parsed: ParsedMessengerWebhook,
-): Promise<{ inbound: number; skipped: number }> {
+): Promise<{
+  inbound: number;
+  skipped: number;
+  notifications: IngestNotification[];
+}> {
   let inbound = 0;
   let skipped = 0;
+  const notifications: IngestNotification[] = [];
 
   for (const m of parsed.messages) {
     if (!m.mid || !m.externalId) {
@@ -23,28 +30,29 @@ export async function ingestMessenger(
     // Asegurar contacto por (channel, external_id).
     const { data: existing } = await sb
       .from("contacts")
-      .select("id, unread_count")
+      .select("id, unread_count, name, username")
       .eq("channel", channel)
       .eq("external_id", m.externalId)
       .maybeSingle();
 
     let contactId: string;
     let unread = 0;
+    let name: string | null = null;
+    let username: string | null = null;
 
     if (existing) {
       contactId = existing.id as string;
       unread = (existing.unread_count as number | null) ?? 0;
+      name = (existing.name as string | null) ?? null;
+      username = (existing.username as string | null) ?? null;
     } else {
       // Contacto nuevo: intentar traer nombre/username (best-effort).
       const profile = await fetchProfile(channel, m.externalId);
+      name = profile.name;
+      username = profile.username;
       const { data: created, error } = await sb
         .from("contacts")
-        .insert({
-          channel,
-          external_id: m.externalId,
-          name: profile.name,
-          username: profile.username,
-        })
+        .insert({ channel, external_id: m.externalId, name, username })
         .select("id")
         .single();
       if (error || !created) {
@@ -83,6 +91,17 @@ export async function ingestMessenger(
       continue;
     }
     inbound++;
+    notifications.push({
+      contactId,
+      title: contactLabel({
+        name,
+        username,
+        phone_number: null,
+        external_id: m.externalId,
+        channel,
+      }),
+      body: messagePreview(m.type, m.body) || "Nuevo mensaje",
+    });
 
     const patch: Record<string, unknown> = {
       last_message_at: when,
@@ -93,5 +112,5 @@ export async function ingestMessenger(
     await sb.from("contacts").update(patch).eq("id", contactId);
   }
 
-  return { inbound, skipped };
+  return { inbound, skipped, notifications };
 }

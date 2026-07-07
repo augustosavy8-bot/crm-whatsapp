@@ -4,6 +4,7 @@ import SignOutButton from "@/components/SignOutButton";
 import HeaderNav from "@/components/HeaderNav";
 import NotificationsProvider from "@/components/notifications/NotificationsProvider";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import PushButton from "@/components/notifications/PushButton";
 
 // Shell protegido: sin sesión no se entra (además del proxy, por las dudas).
 export default async function AppLayout({
@@ -46,6 +47,7 @@ export default async function AppLayout({
           <span className="hidden text-xs text-muted lg:block">
             {user.email}
           </span>
+          <PushButton />
           <NotificationBell />
           <SignOutButton />
         </div>

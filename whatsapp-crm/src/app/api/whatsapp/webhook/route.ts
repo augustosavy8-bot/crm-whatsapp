@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { verifyMetaSignature } from "@/lib/whatsapp/verifySignature";
 import { parseWebhook } from "@/lib/whatsapp/parseWebhook";
 import { ingestWebhook } from "@/lib/whatsapp/ingest";
+import { sendPushToAgents } from "@/lib/push/send";
 
 // El webhook no debe cachearse y corre en Node (usa crypto + service-role).
 export const runtime = "nodejs";
@@ -48,7 +49,24 @@ export async function POST(request: NextRequest) {
     if (parsed.messages.length || parsed.statuses.length) {
       const sb = createServiceClient();
       const summary = await ingestWebhook(sb, parsed);
-      console.log("[whatsapp] ingest", summary);
+      console.log("[whatsapp] ingest", {
+        inbound: summary.inbound,
+        statusUpdates: summary.statusUpdates,
+        skipped: summary.skipped,
+      });
+      // Push aditivo: NUNCA debe afectar la respuesta 200 del webhook.
+      try {
+        for (const n of summary.notifications) {
+          await sendPushToAgents({
+            title: n.title,
+            body: n.body,
+            url: `/inbox?c=${n.contactId}`,
+            tag: `foko-${n.contactId}`,
+          });
+        }
+      } catch (e) {
+        console.error("[whatsapp] push falló (ignorado)", e);
+      }
     }
   } catch (e) {
     // Nunca devolver !=2xx por un error interno: Meta reintenta y duplica.

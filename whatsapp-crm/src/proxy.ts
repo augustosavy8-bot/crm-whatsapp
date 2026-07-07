@@ -8,8 +8,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Corre en todo menos assets estáticos, las rutas de API (el webhook de Meta
-  // NUNCA debe pasar por el proxy de sesión) y /privacy (página pública para Meta).
+  // NUNCA debe pasar por el proxy de sesión), /privacy (página pública) y los
+  // archivos públicos de la PWA (sw.js, manifest.webmanifest, íconos).
   matcher: [
-    "/((?!api|privacy|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|privacy|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|json|txt|webmanifest)$).*)",
   ],
 };
