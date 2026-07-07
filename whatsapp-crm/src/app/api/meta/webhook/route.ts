@@ -30,17 +30,26 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
 
-  // Misma validación de firma que WhatsApp (mismo App Secret).
-  if (!verifyMetaSignature(rawBody, signature)) {
-    console.warn("[meta] firma inválida, rechazado");
-    return new NextResponse("Invalid signature", { status: 401 });
-  }
-
+  // Parsear primero (sin actuar sobre el body) para saber el `object` y elegir el
+  // secret correcto. La firma se valida igual sobre el rawBody exacto antes de ingerir.
   let payload: unknown;
   try {
     payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ ok: true, ignored: "bad_json" });
+  }
+
+  // Instagram firma el X-Hub-Signature-256 con el Instagram App Secret (distinto).
+  // Messenger (object:'page') usa el App Secret general, como WhatsApp.
+  const object = String((payload as Record<string, unknown>)?.object ?? "");
+  const secret =
+    object === "instagram"
+      ? process.env.INSTAGRAM_APP_SECRET
+      : process.env.META_APP_SECRET;
+
+  if (!verifyMetaSignature(rawBody, signature, secret)) {
+    console.warn(`[meta] firma inválida (object=${object}), rechazado`);
+    return new NextResponse("Invalid signature", { status: 401 });
   }
 
   try {
