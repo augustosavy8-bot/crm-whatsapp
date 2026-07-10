@@ -22,18 +22,21 @@ export async function maybeCreateTurnoFromMensaje(
   try {
     // El pedido de turno suele completarse en varios mensajes ("quiero
     // turno" / "el jueves" / "a las 15") — interpretar solo el mensaje
-    // actual pierde ese contexto y nunca junta fecha+hora. Se arma un
-    // bloque con los últimos mensajes del paciente (más el actual) y se
-    // interpreta ese conjunto.
+    // actual pierde ese contexto y nunca junta fecha+hora. Se toman los
+    // últimos mensajes ENTRANTES del paciente (sin contar las respuestas
+    // del bot, que si no le comen lugar a la ventana y el dato relevante
+    // queda afuera) y se interpreta ese conjunto.
     const { data: recientes } = await sb
       .from("messages")
-      .select("direction, type, body, created_at")
+      .select("body, created_at")
       .eq("contact_id", contactId)
+      .eq("direction", "inbound")
+      .eq("type", "text")
       .order("created_at", { ascending: false })
-      .limit(8);
+      .limit(15);
     const historialTexto = (recientes ?? [])
       .reverse()
-      .filter((m) => m.direction === "inbound" && m.type === "text" && (m.body as string | null)?.trim())
+      .filter((m) => (m.body as string | null)?.trim())
       .map((m) => (m.body as string).trim())
       .join("\n");
     const textoParaInterpretar = historialTexto || texto;
