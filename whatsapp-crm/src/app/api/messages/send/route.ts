@@ -38,10 +38,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 3) Contacto (respeta RLS con la sesión del agente)
+  // 3) Contacto (respeta RLS con la sesión del agente -> ya viene scoped a su tenant)
   const { data: contact, error: contactErr } = await supabase
     .from("contacts")
-    .select("id, channel, phone_number, external_id, last_inbound_at")
+    .select("id, tenant_id, channel, phone_number, external_id, last_inbound_at")
     .eq("id", contactId)
     .maybeSingle();
   if (contactErr) {
@@ -67,10 +67,20 @@ export async function POST(request: NextRequest) {
   const channel = (contact.channel as Channel) ?? "whatsapp";
   let externalMessageId: string | null = null;
 
+  // Credenciales del tenant. Hoy salen de env vars (tenant piloto, single);
+  // en el Paso 4 (Embedded Signup) se resuelven desde `tenants` por tenant_id.
   if (channel === "whatsapp") {
     // --- Rama WhatsApp: EQUIVALENTE EXACTA al viejo /api/whatsapp/send ---
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    if (!phoneNumberId || !accessToken) {
+      return NextResponse.json(
+        { error: "WhatsApp no está configurado para este tenant" },
+        { status: 500 },
+      );
+    }
     const to = normalizeArPhone(contact.phone_number as string | null);
-    const result = await sendText(to, body);
+    const result = await sendText(phoneNumberId, accessToken, to, body);
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error || "Falló el envío a WhatsApp" },
@@ -79,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
     externalMessageId = result.waMessageId;
   } else {
-    // --- Rama Instagram / Messenger: Send API con el Page token ---
+    // --- Rama Instagram / Messenger: Send API con el Page/IG token ---
     const recipient = contact.external_id as string | null;
     if (!recipient) {
       return NextResponse.json(
@@ -87,7 +97,17 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const result = await sendMessengerText(channel, recipient, body);
+    const accessToken =
+      channel === "instagram"
+        ? process.env.INSTAGRAM_ACCESS_TOKEN
+        : process.env.META_PAGE_ACCESS_TOKEN;
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: "El canal no está configurado para este tenant" },
+        { status: 500 },
+      );
+    }
+    const result = await sendMessengerText(channel, accessToken, recipient, body);
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error || "Falló el envío" },
@@ -107,6 +127,7 @@ export async function POST(request: NextRequest) {
   const { data: inserted, error: insertErr } = await supabase
     .from("messages")
     .insert({
+      tenant_id: contact.tenant_id,
       contact_id: contact.id,
       channel,
       wa_message_id: externalMessageId,

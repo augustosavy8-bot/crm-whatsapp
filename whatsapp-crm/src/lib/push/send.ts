@@ -23,13 +23,17 @@ export interface PushPayload {
   tag?: string;
 }
 
-export async function sendPushToAgents(payload: PushPayload): Promise<void> {
+export async function sendPushToTenant(
+  tenantId: string,
+  payload: PushPayload,
+): Promise<void> {
   if (!configure()) return; // sin VAPID configurado, no-op
 
   const sb = createServiceClient();
   const { data: subs, error } = await sb
     .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth");
+    .select("id, endpoint, p256dh, auth")
+    .eq("tenant_id", tenantId);
   if (error || !subs?.length) return;
 
   const body = JSON.stringify(payload);

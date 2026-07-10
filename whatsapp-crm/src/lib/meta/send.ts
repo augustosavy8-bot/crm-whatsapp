@@ -2,7 +2,8 @@
 //  - Facebook Messenger: graph.facebook.com + Page Access Token.
 //  - Instagram (Instagram Login): graph.instagram.com + Instagram Access Token.
 // El recipient es el PSID (Messenger) / IGSID (Instagram) guardado en external_id.
-// Secrets siempre por env vars.
+// El token es del tenant que envía (hoy: el piloto, leído de env vars en el call
+// site; en el Paso 4 -Embedded Signup- saldrá de `tenants`). Secrets siempre por env vars.
 
 import type { Channel } from "@/lib/channels";
 
@@ -16,16 +17,14 @@ export interface MessengerSendResult {
 
 export async function sendMessengerText(
   channel: Channel,
+  accessToken: string,
   recipientId: string,
   text: string,
 ): Promise<MessengerSendResult> {
   const isInstagram = channel === "instagram";
   const host = isInstagram ? "graph.instagram.com" : "graph.facebook.com";
-  const token = isInstagram
-    ? process.env.INSTAGRAM_ACCESS_TOKEN
-    : process.env.META_PAGE_ACCESS_TOKEN;
 
-  if (!token) {
+  if (!accessToken) {
     return {
       ok: false,
       messageId: null,
@@ -35,7 +34,7 @@ export async function sendMessengerText(
     };
   }
 
-  const url = `https://${host}/${GRAPH_VERSION}/me/messages?access_token=${token}`;
+  const url = `https://${host}/${GRAPH_VERSION}/me/messages?access_token=${accessToken}`;
   try {
     const res = await fetch(url, {
       method: "POST",

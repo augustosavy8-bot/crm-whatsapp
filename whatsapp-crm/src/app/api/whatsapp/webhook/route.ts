@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { verifyMetaSignature } from "@/lib/whatsapp/verifySignature";
 import { parseWebhook } from "@/lib/whatsapp/parseWebhook";
 import { ingestWebhook } from "@/lib/whatsapp/ingest";
-import { sendPushToAgents } from "@/lib/push/send";
+import { sendPushToTenant } from "@/lib/push/send";
 
 // El webhook no debe cachearse y corre en Node (usa crypto + service-role).
 export const runtime = "nodejs";
@@ -48,8 +48,28 @@ export async function POST(request: NextRequest) {
     const parsed = parseWebhook(payload);
     if (parsed.messages.length || parsed.statuses.length) {
       const sb = createServiceClient();
-      const summary = await ingestWebhook(sb, parsed);
+
+      // Resolver el tenant dueño de este número. Sin match, no hay dónde
+      // guardar el mensaje -> se ignora (pero se responde 200 igual).
+      if (!parsed.phoneNumberId) {
+        console.warn("[whatsapp] webhook sin phone_number_id, ignorado");
+        return NextResponse.json({ ok: true, ignored: "no_phone_number_id" });
+      }
+      const { data: tenant } = await sb
+        .from("tenants")
+        .select("id")
+        .eq("whatsapp_phone_number_id", parsed.phoneNumberId)
+        .maybeSingle();
+      if (!tenant) {
+        console.warn(
+          `[whatsapp] sin tenant para phone_number_id=${parsed.phoneNumberId}, ignorado`,
+        );
+        return NextResponse.json({ ok: true, ignored: "unknown_tenant" });
+      }
+
+      const summary = await ingestWebhook(sb, parsed, tenant.id as string);
       console.log("[whatsapp] ingest", {
+        tenant: tenant.id,
         inbound: summary.inbound,
         statusUpdates: summary.statusUpdates,
         skipped: summary.skipped,
@@ -57,7 +77,7 @@ export async function POST(request: NextRequest) {
       // Push aditivo: NUNCA debe afectar la respuesta 200 del webhook.
       try {
         for (const n of summary.notifications) {
-          await sendPushToAgents({
+          await sendPushToTenant(tenant.id as string, {
             title: n.title,
             body: n.body,
             url: `/inbox?c=${n.contactId}`,

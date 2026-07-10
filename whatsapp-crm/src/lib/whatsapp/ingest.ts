@@ -13,6 +13,7 @@ export interface IngestNotification {
 export async function ingestWebhook(
   sb: SupabaseClient,
   parsed: ParsedWebhook,
+  tenantId: string,
 ): Promise<{
   inbound: number;
   statusUpdates: number;
@@ -32,10 +33,11 @@ export async function ingestWebhook(
     }
     const when = m.timestamp ?? new Date().toISOString();
 
-    // asegurar contacto (por número)
+    // asegurar contacto (por número, dentro del tenant)
     const { data: existing } = await sb
       .from("contacts")
       .select("id, name, unread_count")
+      .eq("tenant_id", tenantId)
       .eq("phone_number", m.from)
       .maybeSingle();
 
@@ -50,7 +52,7 @@ export async function ingestWebhook(
     } else {
       const { data: created, error } = await sb
         .from("contacts")
-        .insert({ phone_number: m.from, wa_id: m.from, name: m.name })
+        .insert({ tenant_id: tenantId, phone_number: m.from, wa_id: m.from, name: m.name })
         .select("id")
         .single();
       if (error || !created) {
@@ -66,6 +68,7 @@ export async function ingestWebhook(
       .from("messages")
       .upsert(
         {
+          tenant_id: tenantId,
           contact_id: contactId,
           wa_message_id: m.waMessageId,
           direction: "inbound",
@@ -116,6 +119,7 @@ export async function ingestWebhook(
     const { error } = await sb
       .from("messages")
       .update(patch)
+      .eq("tenant_id", tenantId)
       .eq("wa_message_id", s.waMessageId);
     if (!error) statusUpdates++;
   }

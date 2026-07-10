@@ -1,19 +1,17 @@
 // Cliente mínimo de la WhatsApp Cloud API (Graph API).
 // Todos los secrets vienen de env vars, nunca hardcodeados.
+// phoneNumberId/accessToken son del tenant que envía (hoy: el piloto, leído
+// de env vars en el call site; en el Paso 4 -Embedded Signup- saldrán de `tenants`).
 
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v21.0";
 
-function graphUrl(): string {
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!phoneId) throw new Error("WHATSAPP_PHONE_NUMBER_ID no configurado");
-  return `https://graph.facebook.com/${GRAPH_VERSION}/${phoneId}/messages`;
+function graphUrl(phoneNumberId: string): string {
+  return `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`;
 }
 
-function authHeaders(): HeadersInit {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  if (!token) throw new Error("WHATSAPP_ACCESS_TOKEN no configurado");
+function authHeaders(accessToken: string): HeadersInit {
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
   };
 }
@@ -24,11 +22,15 @@ export interface SendResult {
   error: string | null;
 }
 
-async function postMessage(payload: Record<string, unknown>): Promise<SendResult> {
+async function postMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  payload: Record<string, unknown>,
+): Promise<SendResult> {
   try {
-    const res = await fetch(graphUrl(), {
+    const res = await fetch(graphUrl(phoneNumberId), {
       method: "POST",
-      headers: authHeaders(),
+      headers: authHeaders(accessToken),
       body: JSON.stringify({ messaging_product: "whatsapp", ...payload }),
     });
     const data = (await res.json()) as Record<string, unknown>;
@@ -52,8 +54,13 @@ async function postMessage(payload: Record<string, unknown>): Promise<SendResult
 }
 
 // Texto libre (solo válido dentro de la ventana de 24hs).
-export function sendText(to: string, body: string): Promise<SendResult> {
-  return postMessage({
+export function sendText(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  body: string,
+): Promise<SendResult> {
+  return postMessage(phoneNumberId, accessToken, {
     to,
     type: "text",
     text: { preview_url: false, body },
@@ -62,12 +69,14 @@ export function sendText(to: string, body: string): Promise<SendResult> {
 
 // Template aprobado con variables por componente (para reabrir fuera de la ventana).
 export function sendTemplate(
+  phoneNumberId: string,
+  accessToken: string,
   to: string,
   name: string,
   language: string,
   components?: unknown[],
 ): Promise<SendResult> {
-  return postMessage({
+  return postMessage(phoneNumberId, accessToken, {
     to,
     type: "template",
     template: {

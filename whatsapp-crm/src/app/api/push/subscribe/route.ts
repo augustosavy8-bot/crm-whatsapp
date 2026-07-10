@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   const { data: agent } = await supabase
     .from("agents")
-    .select("id")
+    .select("id, tenant_id")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -44,7 +44,13 @@ export async function POST(request: NextRequest) {
   const { error } = await admin
     .from("push_subscriptions")
     .upsert(
-      { agent_id: agent?.id ?? null, endpoint, p256dh, auth },
+      {
+        agent_id: agent?.id ?? null,
+        tenant_id: agent?.tenant_id ?? null,
+        endpoint,
+        p256dh,
+        auth,
+      },
       { onConflict: "endpoint" },
     );
   if (error) {

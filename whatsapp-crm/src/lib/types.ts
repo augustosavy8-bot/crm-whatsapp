@@ -25,7 +25,7 @@ export interface Contact {
   last_message_at: string | null;
   last_inbound_at: string | null;
   unread_count: number;
-  client_id: string | null;
+  tenant_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -44,15 +44,33 @@ export interface Message {
   error: string | null;
   raw_payload: unknown;
   sent_by: string | null;
-  client_id: string | null;
+  tenant_id: string | null;
   created_at: string;
 }
+
+export type AgentRole = "owner" | "profesional" | "secretaria";
 
 export interface Agent {
   id: string;
   auth_user_id: string | null;
+  tenant_id: string | null;
+  role: AgentRole;
   name: string | null;
   email: string | null;
+  created_at: string;
+}
+
+export type TenantStatus = "trialing" | "active" | "paused" | "cancelled";
+
+export interface Tenant {
+  id: string;
+  nombre: string;
+  rubro_slug: string;
+  status: TenantStatus;
+  whatsapp_phone_number_id: string | null;
+  whatsapp_waba_id: string | null;
+  messenger_page_id: string | null;
+  instagram_business_id: string | null;
   created_at: string;
 }
 
@@ -64,7 +82,7 @@ export interface Template {
   body: string | null;
   variables: unknown;
   approved: boolean;
-  client_id: string | null;
+  tenant_id: string | null;
   created_at: string;
 }
 

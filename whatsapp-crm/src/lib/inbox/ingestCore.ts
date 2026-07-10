@@ -10,6 +10,7 @@ import { contactLabel, messagePreview } from "@/lib/format";
 export async function ingestMessenger(
   sb: SupabaseClient,
   parsed: ParsedMessengerWebhook,
+  tenantId: string,
 ): Promise<{
   inbound: number;
   skipped: number;
@@ -27,10 +28,11 @@ export async function ingestMessenger(
     const when = m.timestamp ?? new Date().toISOString();
     const channel: Channel = m.channel;
 
-    // Asegurar contacto por (channel, external_id).
+    // Asegurar contacto por (tenant, channel, external_id).
     const { data: existing } = await sb
       .from("contacts")
       .select("id, unread_count, name, username")
+      .eq("tenant_id", tenantId)
       .eq("channel", channel)
       .eq("external_id", m.externalId)
       .maybeSingle();
@@ -65,7 +67,7 @@ export async function ingestMessenger(
       username = profile.username;
       const { data: created, error } = await sb
         .from("contacts")
-        .insert({ channel, external_id: m.externalId, name, username })
+        .insert({ tenant_id: tenantId, channel, external_id: m.externalId, name, username })
         .select("id")
         .single();
       if (error || !created) {
@@ -81,6 +83,7 @@ export async function ingestMessenger(
       .from("messages")
       .upsert(
         {
+          tenant_id: tenantId,
           contact_id: contactId,
           channel,
           wa_message_id: m.mid,

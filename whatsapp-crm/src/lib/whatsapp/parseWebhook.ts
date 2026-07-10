@@ -22,6 +22,7 @@ export interface ParsedStatus {
 export interface ParsedWebhook {
   messages: ParsedInboundMessage[];
   statuses: ParsedStatus[];
+  phoneNumberId: string | null;
 }
 
 function tsToIso(ts: unknown): string | null {
@@ -65,6 +66,7 @@ function extractBody(msg: Record<string, unknown>): string | null {
 export function parseWebhook(payload: unknown): ParsedWebhook {
   const messages: ParsedInboundMessage[] = [];
   const statuses: ParsedStatus[] = [];
+  let phoneNumberId: string | null = null;
 
   const root = payload as Record<string, unknown>;
   const entries = Array.isArray(root?.entry) ? root.entry : [];
@@ -77,6 +79,13 @@ export function parseWebhook(payload: unknown): ParsedWebhook {
     for (const change of changes) {
       const value = ((change as Record<string, unknown>)?.value ??
         {}) as Record<string, unknown>;
+
+      // Identifica qué WABA/número recibió el mensaje -> resuelve el tenant.
+      const metadata = value.metadata as Record<string, unknown> | undefined;
+      const valuePhoneNumberId = metadata?.phone_number_id;
+      if (valuePhoneNumberId && !phoneNumberId) {
+        phoneNumberId = String(valuePhoneNumberId);
+      }
 
       // nombre de perfil por wa_id (viene en contacts[])
       const nameByWaId = new Map<string, string>();
@@ -132,5 +141,5 @@ export function parseWebhook(payload: unknown): ParsedWebhook {
     }
   }
 
-  return { messages, statuses };
+  return { messages, statuses, phoneNumberId };
 }

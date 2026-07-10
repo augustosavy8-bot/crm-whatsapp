@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { verifyMetaSignature } from "@/lib/whatsapp/verifySignature";
 import { parseMessenger } from "@/lib/meta/parseMessenger";
 import { ingestMessenger } from "@/lib/inbox/ingestCore";
-import { sendPushToAgents } from "@/lib/push/send";
+import { sendPushToTenant } from "@/lib/push/send";
 
 // Webhook de la Messenger Platform (Facebook Messenger + Instagram DMs).
 // Separado del de WhatsApp para no tocar el flujo de producción.
@@ -57,15 +57,36 @@ export async function POST(request: NextRequest) {
     const parsed = parseMessenger(payload);
     if (parsed.messages.length) {
       const sb = createServiceClient();
-      const summary = await ingestMessenger(sb, parsed);
+
+      // Resolver el tenant dueño de esta página/cuenta IG.
+      if (!parsed.recipientId) {
+        console.warn("[meta] webhook sin recipientId, ignorado");
+        return NextResponse.json({ ok: true, ignored: "no_recipient_id" });
+      }
+      const idColumn =
+        object === "instagram" ? "instagram_business_id" : "messenger_page_id";
+      const { data: tenant } = await sb
+        .from("tenants")
+        .select("id")
+        .eq(idColumn, parsed.recipientId)
+        .maybeSingle();
+      if (!tenant) {
+        console.warn(
+          `[meta] sin tenant para ${idColumn}=${parsed.recipientId}, ignorado`,
+        );
+        return NextResponse.json({ ok: true, ignored: "unknown_tenant" });
+      }
+
+      const summary = await ingestMessenger(sb, parsed, tenant.id as string);
       console.log("[meta] ingest", {
+        tenant: tenant.id,
         inbound: summary.inbound,
         skipped: summary.skipped,
       });
       // Push aditivo: NUNCA debe afectar la respuesta 200 del webhook.
       try {
         for (const n of summary.notifications) {
-          await sendPushToAgents({
+          await sendPushToTenant(tenant.id as string, {
             title: n.title,
             body: n.body,
             url: `/inbox?c=${n.contactId}`,

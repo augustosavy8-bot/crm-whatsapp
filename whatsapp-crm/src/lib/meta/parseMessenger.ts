@@ -16,6 +16,9 @@ export interface ParsedMessengerMessage {
 
 export interface ParsedMessengerWebhook {
   messages: ParsedMessengerMessage[];
+  // entry[].id: page id (Messenger) o IG business account id (Instagram).
+  // Identifica qué cuenta recibió el mensaje -> resuelve el tenant.
+  recipientId: string | null;
 }
 
 function tsToIso(ts: unknown): string | null {
@@ -46,6 +49,7 @@ function extractBodyAndType(message: Record<string, unknown>): {
 
 export function parseMessenger(payload: unknown): ParsedMessengerWebhook {
   const messages: ParsedMessengerMessage[] = [];
+  let recipientId: string | null = null;
   const root = payload as Record<string, unknown>;
 
   // Discriminador: 'instagram' => IG DMs; 'page' => Facebook Messenger.
@@ -56,10 +60,13 @@ export function parseMessenger(payload: unknown): ParsedMessengerWebhook {
       : object === "page"
         ? "facebook"
         : null;
-  if (!channel) return { messages };
+  if (!channel) return { messages, recipientId };
 
   const entries = Array.isArray(root.entry) ? root.entry : [];
   for (const entry of entries) {
+    const entryId = (entry as Record<string, unknown>)?.id;
+    if (entryId && !recipientId) recipientId = String(entryId);
+
     const messaging = (entry as Record<string, unknown>)?.messaging;
     const events = Array.isArray(messaging) ? messaging : [];
     for (const ev of events as Record<string, unknown>[]) {
@@ -85,5 +92,5 @@ export function parseMessenger(payload: unknown): ParsedMessengerWebhook {
     }
   }
 
-  return { messages };
+  return { messages, recipientId };
 }
