@@ -124,6 +124,28 @@ export default function InboxClient({
     [selectedId, appendMessage, refreshConversations],
   );
 
+  // Alterna modo IA / humano de la conversación seleccionada. Reactivar la
+  // IA resetea el contador de respuestas seguidas.
+  const toggleModoAtencion = useCallback(async () => {
+    if (!selectedId) return;
+    const actual = conversations.find((c) => c.id === selectedId);
+    if (!actual) return;
+    const nuevoModo = actual.modo_atencion === "ia" ? "humano" : "ia";
+    const patch: Record<string, unknown> =
+      nuevoModo === "ia"
+        ? { modo_atencion: "ia", ia_respuestas_consecutivas: 0 }
+        : { modo_atencion: "humano" };
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === selectedId
+          ? { ...c, ...patch } as ConversationListItem
+          : c,
+      ),
+    );
+    await supabase.from("contacts").update(patch).eq("id", selectedId);
+    refreshConversations();
+  }, [selectedId, conversations, supabase, refreshConversations]);
+
   // Realtime
   useRealtimeInbox({
     onMessageInsert: (msg) => {
@@ -229,6 +251,7 @@ export default function InboxClient({
             sendError={sendError}
             onSend={sendMessage}
             onBack={() => setSelectedId(null)}
+            onToggleModoAtencion={toggleModoAtencion}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-canvas text-sm text-muted">

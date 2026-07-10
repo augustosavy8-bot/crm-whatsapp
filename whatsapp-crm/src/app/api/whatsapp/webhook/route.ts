@@ -5,6 +5,7 @@ import { parseWebhook } from "@/lib/whatsapp/parseWebhook";
 import { ingestWebhook } from "@/lib/whatsapp/ingest";
 import { sendPushToTenant } from "@/lib/push/send";
 import { maybeCreateTurnoFromMensaje } from "@/lib/turnosIA";
+import { maybeAutoReply } from "@/lib/whatsappBot";
 
 // El webhook no debe cachearse y corre en Node (usa crypto + service-role).
 export const runtime = "nodejs";
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       }
       const { data: tenant } = await sb
         .from("tenants")
-        .select("id")
+        .select("id, nombre, ia_autorespuesta_activa")
         .eq("whatsapp_phone_number_id", parsed.phoneNumberId)
         .maybeSingle();
       if (!tenant) {
@@ -101,6 +102,28 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.error("[whatsapp] interpretación de turno falló (ignorado)", e);
+      }
+
+      // Auto-respuesta con IA, aditiva: NUNCA debe afectar la respuesta 200
+      // del webhook. Credenciales del tenant: hoy salen de env vars (tenant
+      // piloto, single-tenant), igual que /api/messages/send/route.ts.
+      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+      if (phoneNumberId && accessToken) {
+        try {
+          for (const c of summary.turnoCandidatos) {
+            await maybeAutoReply(sb, {
+              tenantId: tenant.id as string,
+              tenantIaActiva: tenant.ia_autorespuesta_activa as boolean,
+              tenantNombre: tenant.nombre as string | null,
+              contactId: c.contactId,
+              phoneNumberId,
+              accessToken,
+            });
+          }
+        } catch (e) {
+          console.error("[whatsapp] auto-respuesta IA falló (ignorado)", e);
+        }
       }
     }
   } catch (e) {

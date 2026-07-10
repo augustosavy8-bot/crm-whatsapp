@@ -10,6 +10,8 @@ export type MessageStatus =
   | "read"
   | "failed";
 
+export type ModoAtencion = "ia" | "humano";
+
 export interface Contact {
   id: string;
   channel: Channel;
@@ -28,6 +30,8 @@ export interface Contact {
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
+  modo_atencion: ModoAtencion;
+  ia_respuestas_consecutivas: number;
 }
 
 export interface Message {
@@ -44,6 +48,7 @@ export interface Message {
   error: string | null;
   raw_payload: unknown;
   sent_by: string | null;
+  is_bot: boolean;
   tenant_id: string | null;
   created_at: string;
 }
@@ -71,6 +76,7 @@ export interface Tenant {
   whatsapp_waba_id: string | null;
   messenger_page_id: string | null;
   instagram_business_id: string | null;
+  ia_autorespuesta_activa: boolean;
   created_at: string;
 }
 

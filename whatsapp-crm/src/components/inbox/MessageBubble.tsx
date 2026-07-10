@@ -28,10 +28,15 @@ export default function MessageBubble({ message }: { message: Message }) {
         </p>
         <div
           className={[
-            "mt-0.5 text-right text-[10px] tabular-nums",
+            "mt-0.5 flex items-center justify-end gap-1 text-right text-[10px] tabular-nums",
             isOutbound ? "text-white/55" : "text-faint",
           ].join(" ")}
         >
+          {message.is_bot && (
+            <span title="Respondido por la IA" className="not-tabular-nums">
+              🤖
+            </span>
+          )}
           {formatTime(message.created_at)}
         </div>
       </div>
