@@ -135,6 +135,9 @@ export type TurnoEstado =
   | "atendido"
   | "ausente";
 
+export type TurnoOrigen = "manual" | "ia_whatsapp" | "ia_manual";
+export type IaConfianza = "alta" | "media" | "baja";
+
 export interface Turno {
   id: string;
   tenant_id: string;
@@ -145,7 +148,22 @@ export interface Turno {
   estado: TurnoEstado;
   notas: string | null;
   recordatorio_enviado_at: string | null;
+  origen: TurnoOrigen;
+  ia_confianza: IaConfianza | null;
+  ia_notas_originales: string | null;
   created_at: string;
+}
+
+// Salida estructurada de la interpretación de turnos con IA.
+export interface InterpretedTurno {
+  es_pedido_turno: boolean;
+  fecha: string | null; // YYYY-MM-DD
+  hora: string | null; // HH:MM (24h)
+  duracion_min: number | null;
+  notas: string | null;
+  paciente_nombre: string | null; // solo relevante en el flujo de texto libre
+  confianza: IaConfianza;
+  ambiguedades: string[];
 }
 
 // Turno + datos del paciente para listar sin joins manuales en la UI.

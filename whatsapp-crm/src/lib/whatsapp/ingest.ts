@@ -8,6 +8,11 @@ export interface IngestNotification {
   body: string;
 }
 
+export interface TurnoCandidato {
+  contactId: string;
+  texto: string;
+}
+
 // Persiste lo que llega del webhook usando el cliente service-role (saltea RLS).
 // Devuelve un resumen para loguear/diagnosticar + las notificaciones a pushear.
 export async function ingestWebhook(
@@ -19,11 +24,13 @@ export async function ingestWebhook(
   statusUpdates: number;
   skipped: number;
   notifications: IngestNotification[];
+  turnoCandidatos: TurnoCandidato[];
 }> {
   let inbound = 0;
   let skipped = 0;
   let statusUpdates = 0;
   const notifications: IngestNotification[] = [];
+  const turnoCandidatos: TurnoCandidato[] = [];
 
   // --- mensajes entrantes ---
   for (const m of parsed.messages) {
@@ -98,6 +105,9 @@ export async function ingestWebhook(
       title: (m.name && m.name.trim()) || m.from,
       body: messagePreview(m.type, m.body) || "Nuevo mensaje",
     });
+    if (m.type === "text" && m.body?.trim()) {
+      turnoCandidatos.push({ contactId, texto: m.body.trim() });
+    }
 
     // actualizar contacto: nombre (si faltaba), timestamps y no leídos
     const patch: Record<string, unknown> = {
@@ -124,5 +134,5 @@ export async function ingestWebhook(
     if (!error) statusUpdates++;
   }
 
-  return { inbound, statusUpdates, skipped, notifications };
+  return { inbound, statusUpdates, skipped, notifications, turnoCandidatos };
 }

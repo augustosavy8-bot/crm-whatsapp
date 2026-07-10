@@ -4,6 +4,7 @@ import { verifyMetaSignature } from "@/lib/whatsapp/verifySignature";
 import { parseWebhook } from "@/lib/whatsapp/parseWebhook";
 import { ingestWebhook } from "@/lib/whatsapp/ingest";
 import { sendPushToTenant } from "@/lib/push/send";
+import { maybeCreateTurnoFromMensaje } from "@/lib/turnosIA";
 
 // El webhook no debe cachearse y corre en Node (usa crypto + service-role).
 export const runtime = "nodejs";
@@ -86,6 +87,20 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.error("[whatsapp] push falló (ignorado)", e);
+      }
+
+      // Interpretación de turnos con IA, aditiva: NUNCA debe afectar la
+      // respuesta 200 del webhook.
+      try {
+        for (const c of summary.turnoCandidatos) {
+          await maybeCreateTurnoFromMensaje(sb, {
+            tenantId: tenant.id as string,
+            contactId: c.contactId,
+            texto: c.texto,
+          });
+        }
+      } catch (e) {
+        console.error("[whatsapp] interpretación de turno falló (ignorado)", e);
       }
     }
   } catch (e) {
