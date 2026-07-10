@@ -109,3 +109,79 @@ export interface MessagesDaily {
   channel: Channel;
   inbound: number;
 }
+
+// ------------------------------------------------------------
+// Dominio clínico (Paso 3)
+// ------------------------------------------------------------
+
+export interface Paciente {
+  id: string;
+  tenant_id: string;
+  contact_id: string | null;
+  nombre: string;
+  dni: string | null;
+  telefono: string | null;
+  email: string | null;
+  obra_social: string | null;
+  datos: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TurnoEstado =
+  | "pendiente"
+  | "confirmado"
+  | "cancelado"
+  | "atendido"
+  | "ausente";
+
+export interface Turno {
+  id: string;
+  tenant_id: string;
+  paciente_id: string;
+  profesional_id: string | null;
+  fecha_hora: string;
+  duracion_min: number;
+  estado: TurnoEstado;
+  notas: string | null;
+  recordatorio_enviado_at: string | null;
+  created_at: string;
+}
+
+// Turno + datos del paciente para listar sin joins manuales en la UI.
+export interface TurnoConPaciente extends Turno {
+  paciente: Pick<Paciente, "id" | "nombre" | "telefono"> | null;
+}
+
+export interface HistoriaClinica {
+  id: string;
+  tenant_id: string;
+  paciente_id: string;
+  profesional_id: string | null;
+  fecha: string;
+  datos: Record<string, unknown>;
+  created_at: string;
+}
+
+export type CampoTipo =
+  | "text"
+  | "number"
+  | "select"
+  | "date"
+  | "boolean"
+  | "textarea";
+
+export type CampoEntidad = "paciente" | "turno" | "historia_clinica";
+
+export interface CampoConfig {
+  id: string;
+  vertical_slug: string;
+  tenant_id: string | null;
+  entidad: CampoEntidad;
+  campo: string;
+  tipo: CampoTipo;
+  etiqueta: string;
+  opciones: string[];
+  obligatorio: boolean;
+  orden: number;
+}

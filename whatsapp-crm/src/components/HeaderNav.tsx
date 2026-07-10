@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/dashboard", label: "Inicio" },
   { href: "/inbox", label: "Inbox" },
+  { href: "/pacientes", label: "Pacientes" },
+  { href: "/turnos", label: "Turnos" },
 ];
 
 export default function HeaderNav() {
