@@ -2,7 +2,7 @@
 
 export type ConversationStatus = "abierta" | "en_proceso" | "resuelta";
 export type MessageDirection = "inbound" | "outbound";
-export type Channel = "whatsapp" | "instagram" | "facebook";
+export type Channel = "whatsapp";
 export type MessageStatus =
   | "queued"
   | "sent"

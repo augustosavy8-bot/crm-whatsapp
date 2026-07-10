@@ -1,13 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendText } from "@/lib/whatsapp/meta";
-import { sendMessengerText } from "@/lib/meta/send";
 import { isWindowOpen } from "@/lib/window";
 import { normalizeArPhone } from "@/lib/phone";
-import type { Channel } from "@/lib/channels";
 
-// Envío de texto libre multicanal (WhatsApp / Instagram / Messenger).
-// Requiere sesión (a diferencia de los webhooks). Reemplaza a /api/whatsapp/send.
+// Envío de texto libre por WhatsApp. Requiere sesión (a diferencia de los
+// webhooks). Reemplaza a /api/whatsapp/send.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -41,7 +39,7 @@ export async function POST(request: NextRequest) {
   // 3) Contacto (respeta RLS con la sesión del agente -> ya viene scoped a su tenant)
   const { data: contact, error: contactErr } = await supabase
     .from("contacts")
-    .select("id, tenant_id, channel, phone_number, external_id, last_inbound_at")
+    .select("id, tenant_id, phone_number, last_inbound_at")
     .eq("id", contactId)
     .maybeSingle();
   if (contactErr) {
@@ -51,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Contacto no encontrado" }, { status: 404 });
   }
 
-  // 4) Ventana de 24hs (autoridad server-side; aplica a los 3 canales)
+  // 4) Ventana de 24hs (autoridad server-side)
   if (!isWindowOpen(contact.last_inbound_at as string | null)) {
     return NextResponse.json(
       {
@@ -63,59 +61,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 5) Enviar por la API que corresponda según el canal.
-  const channel = (contact.channel as Channel) ?? "whatsapp";
-  let externalMessageId: string | null = null;
-
+  // 5) Enviar por WhatsApp.
   // Credenciales del tenant. Hoy salen de env vars (tenant piloto, single);
   // en el Paso 4 (Embedded Signup) se resuelven desde `tenants` por tenant_id.
-  if (channel === "whatsapp") {
-    // --- Rama WhatsApp: EQUIVALENTE EXACTA al viejo /api/whatsapp/send ---
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    if (!phoneNumberId || !accessToken) {
-      return NextResponse.json(
-        { error: "WhatsApp no está configurado para este tenant" },
-        { status: 500 },
-      );
-    }
-    const to = normalizeArPhone(contact.phone_number as string | null);
-    const result = await sendText(phoneNumberId, accessToken, to, body);
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error || "Falló el envío a WhatsApp" },
-        { status: 502 },
-      );
-    }
-    externalMessageId = result.waMessageId;
-  } else {
-    // --- Rama Instagram / Messenger: Send API con el Page/IG token ---
-    const recipient = contact.external_id as string | null;
-    if (!recipient) {
-      return NextResponse.json(
-        { error: "El contacto no tiene identificador de destino" },
-        { status: 400 },
-      );
-    }
-    const accessToken =
-      channel === "instagram"
-        ? process.env.INSTAGRAM_ACCESS_TOKEN
-        : process.env.META_PAGE_ACCESS_TOKEN;
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: "El canal no está configurado para este tenant" },
-        { status: 500 },
-      );
-    }
-    const result = await sendMessengerText(channel, accessToken, recipient, body);
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error || "Falló el envío" },
-        { status: 502 },
-      );
-    }
-    externalMessageId = result.messageId;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!phoneNumberId || !accessToken) {
+    return NextResponse.json(
+      { error: "WhatsApp no está configurado para este tenant" },
+      { status: 500 },
+    );
   }
+  const to = normalizeArPhone(contact.phone_number as string | null);
+  const result = await sendText(phoneNumberId, accessToken, to, body);
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error || "Falló el envío a WhatsApp" },
+      { status: 502 },
+    );
+  }
+  const externalMessageId = result.waMessageId;
 
   // 6) Persistir el saliente (+ reordenar la conversación)
   const { data: agent } = await supabase
@@ -129,7 +94,7 @@ export async function POST(request: NextRequest) {
     .insert({
       tenant_id: contact.tenant_id,
       contact_id: contact.id,
-      channel,
+      channel: "whatsapp",
       wa_message_id: externalMessageId,
       direction: "outbound",
       type: "text",

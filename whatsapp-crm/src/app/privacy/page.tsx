@@ -33,11 +33,10 @@ export default function PrivacyPage() {
             <p>
               Esta aplicación es una herramienta interna de gestión de mensajes
               (CRM) que permite recibir y responder consultas de clientes
-              provenientes de <strong>WhatsApp</strong>,{" "}
-              <strong>Instagram</strong> y <strong>Facebook Messenger</strong>,
-              integrándose con dichas plataformas a través de las APIs oficiales
-              de Meta. Esta política describe qué datos se procesan, con qué
-              finalidad y cómo se protegen.
+              provenientes de <strong>WhatsApp</strong>, integrándose con la
+              plataforma a través de la API oficial de Meta. Esta política
+              describe qué datos se procesan, con qué finalidad y cómo se
+              protegen.
             </p>
           </section>
 
@@ -54,11 +53,8 @@ export default function PrivacyPage() {
                 contacto, cuando la plataforma lo provee.
               </li>
               <li>
-                Los <strong>identificadores de las plataformas</strong>
-                necesarios para enrutar los mensajes: número de teléfono
-                (WhatsApp) e identificadores internos de usuario como el
-                Page-Scoped ID (PSID) de Messenger o el ID de usuario de
-                Instagram (IGSID).
+                El <strong>número de teléfono</strong> del contacto, necesario
+                para enrutar los mensajes por WhatsApp.
               </li>
               <li>
                 Metadatos operativos asociados a cada mensaje, como la fecha y
@@ -103,21 +99,20 @@ export default function PrivacyPage() {
           <Section title="4. Compartir con terceros">
             <p>
               No compartimos los datos con terceros, salvo lo estrictamente
-              necesario para operar el servicio: las <strong>plataformas de
-              Meta</strong> (WhatsApp, Instagram y Facebook Messenger), a través
-              de sus APIs oficiales, para poder entregar y recibir los mensajes;
-              y el proveedor de base de datos (<strong>Supabase</strong>) donde
-              se alojan los datos. Cada uno procesa la información según sus
-              propias políticas.
+              necesario para operar el servicio: <strong>WhatsApp Business
+              Platform</strong> (Meta), a través de su API oficial, para poder
+              entregar y recibir los mensajes; y el proveedor de base de datos
+              (<strong>Supabase</strong>) donde se alojan los datos. Cada uno
+              procesa la información según sus propias políticas.
             </p>
           </Section>
 
-          <Section title="5. Integración con las plataformas de Meta">
+          <Section title="5. Integración con WhatsApp">
             <p>
-              Esta aplicación se integra con WhatsApp Business Platform,
-              Instagram Messaging y Facebook Messenger utilizando las APIs
-              oficiales de Meta. El uso de esas plataformas está sujeto además a
-              las políticas de privacidad y condiciones de Meta.
+              Esta aplicación se integra con WhatsApp Business Platform
+              utilizando la API oficial de Meta. El uso de esa plataforma está
+              sujeto además a las políticas de privacidad y condiciones de
+              Meta.
             </p>
           </Section>
 

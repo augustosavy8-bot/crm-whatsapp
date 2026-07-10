@@ -53,20 +53,16 @@ export function displayName(
   return (name && name.trim()) || phone || "Sin número";
 }
 
-// Etiqueta de un contacto que puede NO tener teléfono (IG/Messenger):
-// nombre → @username → teléfono → label del canal (mejor que el id crudo).
+// Etiqueta de un contacto: nombre → @username → teléfono → id crudo.
 export function contactLabel(c: {
   name: string | null;
   username: string | null;
   phone_number: string | null;
   external_id?: string | null;
-  channel?: string | null;
 }): string {
   if (c.name && c.name.trim()) return c.name;
   if (c.username && c.username.trim()) return "@" + c.username.trim();
   if (c.phone_number && c.phone_number.trim()) return c.phone_number;
-  if (c.channel === "instagram") return "Usuario de Instagram";
-  if (c.channel === "facebook") return "Usuario de Messenger";
   if (c.external_id) return "#" + c.external_id.slice(-6);
   return "Sin identificar";
 }

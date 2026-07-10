@@ -9,8 +9,6 @@ import {
 } from "@/lib/conversations";
 import type { ConversationListItem, Message } from "@/lib/types";
 import { isWindowOpen } from "@/lib/window";
-import { CHANNELS, CHANNEL_LABEL, type Channel } from "@/lib/channels";
-import ChannelIcon from "@/components/ChannelIcon";
 import ConversationList from "./ConversationList";
 import ChatWindow from "./ChatWindow";
 import { useRealtimeInbox } from "./useRealtimeInbox";
@@ -32,7 +30,6 @@ export default function InboxClient({
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Channel | "all">("all");
   // Viewport visible en mobile (para el chat full-screen con teclado).
   const vp = useMobileVisualViewport();
 
@@ -165,16 +162,6 @@ export default function InboxClient({
     conversations.find((c) => c.id === selectedId) ?? null;
   const windowOpen = isWindowOpen(selectedContact?.last_inbound_at ?? null);
 
-  // Filtro por canal (tab). Cuenta por canal para los badges de las tabs.
-  const visibleConversations =
-    tab === "all"
-      ? conversations
-      : conversations.filter((c) => c.channel === tab);
-  const countFor = (ch: Channel | "all") =>
-    ch === "all"
-      ? conversations.length
-      : conversations.filter((c) => c.channel === ch).length;
-
   return (
     <div className="flex h-full">
       {/* Columna izquierda: lista */}
@@ -184,35 +171,12 @@ export default function InboxClient({
           "w-full shrink-0 flex-col border-r border-line bg-surface md:w-[380px]",
         ].join(" ")}
       >
-        <div className="shrink-0 px-4 pt-4 pb-2 text-lg font-bold tracking-tight">
+        <div className="shrink-0 px-4 pt-4 pb-3 text-lg font-bold tracking-tight">
           Conversaciones
-        </div>
-        {/* Tabs por canal */}
-        <div className="flex shrink-0 gap-1 overflow-x-auto px-3 pb-3">
-          {(["all", ...CHANNELS] as const).map((c) => {
-            const active = tab === c;
-            const label = c === "all" ? "Todos" : CHANNEL_LABEL[c];
-            return (
-              <button
-                key={c}
-                onClick={() => setTab(c)}
-                className={[
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors",
-                  active
-                    ? "bg-ink text-white"
-                    : "text-muted hover:bg-surface-2",
-                ].join(" ")}
-              >
-                {c !== "all" && <ChannelIcon channel={c} size={14} />}
-                {label}
-                <span className="opacity-60 tabular-nums">{countFor(c)}</span>
-              </button>
-            );
-          })}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-line">
           <ConversationList
-            conversations={visibleConversations}
+            conversations={conversations}
             selectedId={selectedId}
             onSelect={openConversation}
           />
