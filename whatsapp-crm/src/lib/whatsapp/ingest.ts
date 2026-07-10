@@ -1,12 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ParsedWebhook } from "./parseWebhook";
-import { messagePreview } from "@/lib/format";
-
-export interface IngestNotification {
-  contactId: string;
-  title: string;
-  body: string;
-}
 
 export interface TurnoCandidato {
   contactId: string;
@@ -23,13 +16,11 @@ export async function ingestWebhook(
   inbound: number;
   statusUpdates: number;
   skipped: number;
-  notifications: IngestNotification[];
   turnoCandidatos: TurnoCandidato[];
 }> {
   let inbound = 0;
   let skipped = 0;
   let statusUpdates = 0;
-  const notifications: IngestNotification[] = [];
   const turnoCandidatos: TurnoCandidato[] = [];
 
   // --- mensajes entrantes ---
@@ -100,11 +91,6 @@ export async function ingestWebhook(
       continue;
     }
     inbound++;
-    notifications.push({
-      contactId,
-      title: (m.name && m.name.trim()) || m.from,
-      body: messagePreview(m.type, m.body) || "Nuevo mensaje",
-    });
     if (m.type === "text" && m.body?.trim()) {
       turnoCandidatos.push({ contactId, texto: m.body.trim() });
     }
@@ -134,5 +120,5 @@ export async function ingestWebhook(
     if (!error) statusUpdates++;
   }
 
-  return { inbound, statusUpdates, skipped, notifications, turnoCandidatos };
+  return { inbound, statusUpdates, skipped, turnoCandidatos };
 }

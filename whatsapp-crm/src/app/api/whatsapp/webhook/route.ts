@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { verifyMetaSignature } from "@/lib/whatsapp/verifySignature";
 import { parseWebhook } from "@/lib/whatsapp/parseWebhook";
 import { ingestWebhook } from "@/lib/whatsapp/ingest";
-import { sendPushToTenant } from "@/lib/push/send";
 import { maybeCreateTurnoFromMensaje } from "@/lib/turnosIA";
 import { maybeAutoReply } from "@/lib/whatsappBot";
 
@@ -76,19 +75,9 @@ export async function POST(request: NextRequest) {
         statusUpdates: summary.statusUpdates,
         skipped: summary.skipped,
       });
-      // Push aditivo: NUNCA debe afectar la respuesta 200 del webhook.
-      try {
-        for (const n of summary.notifications) {
-          await sendPushToTenant(tenant.id as string, {
-            title: n.title,
-            body: n.body,
-            url: `/inbox?c=${n.contactId}`,
-            tag: `foko-${n.contactId}`,
-          });
-        }
-      } catch (e) {
-        console.error("[whatsapp] push falló (ignorado)", e);
-      }
+      // Sin push por cada mensaje entrante (a propósito): solo se notifica
+      // cuando la IA deriva un turno para aprobar (turnosIA.ts) o cuando
+      // deriva la conversación a un humano (whatsappBot.ts).
 
       // Interpretación de turnos con IA, aditiva: NUNCA debe afectar la
       // respuesta 200 del webhook.

@@ -5,6 +5,7 @@ import HeaderNav from "@/components/HeaderNav";
 import NotificationsProvider from "@/components/notifications/NotificationsProvider";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import PushButton from "@/components/notifications/PushButton";
+import AIAvatar from "@/components/AIAvatar";
 
 // Shell protegido: sin sesión no se entra (además del proxy, por las dudas).
 export default async function AppLayout({
@@ -17,6 +18,12 @@ export default async function AppLayout({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { count: pendientesIA } = await supabase
+    .from("turnos")
+    .select("id", { count: "exact", head: true })
+    .eq("estado", "pendiente")
+    .neq("origen", "manual");
 
   return (
     <NotificationsProvider>
@@ -53,6 +60,7 @@ export default async function AppLayout({
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
+      <AIAvatar pendientesCount={pendientesIA ?? 0} />
     </div>
     </NotificationsProvider>
   );

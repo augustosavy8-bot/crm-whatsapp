@@ -19,10 +19,28 @@ export async function maybeCreateTurnoFromMensaje(
   if (!pareceMencionarTurno(texto)) return;
 
   try {
+    // El pedido de turno suele completarse en varios mensajes ("quiero
+    // turno" / "el jueves" / "a las 15") — interpretar solo el mensaje
+    // actual pierde ese contexto y nunca junta fecha+hora. Se arma un
+    // bloque con los últimos mensajes del paciente (más el actual) y se
+    // interpreta ese conjunto.
+    const { data: recientes } = await sb
+      .from("messages")
+      .select("direction, type, body, created_at")
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false })
+      .limit(8);
+    const historialTexto = (recientes ?? [])
+      .reverse()
+      .filter((m) => m.direction === "inbound" && m.type === "text" && (m.body as string | null)?.trim())
+      .map((m) => (m.body as string).trim())
+      .join("\n");
+    const textoParaInterpretar = historialTexto || texto;
+
     const hoyISO = new Date().toLocaleDateString("en-CA", {
       timeZone: "America/Argentina/Buenos_Aires",
     }); // en-CA -> YYYY-MM-DD
-    const interpretado = await interpretTurnoText(texto, { hoyISO });
+    const interpretado = await interpretTurnoText(textoParaInterpretar, { hoyISO });
     if (!interpretado || !interpretado.es_pedido_turno) return;
     if (!interpretado.fecha || !interpretado.hora) return;
 
@@ -60,6 +78,21 @@ export async function maybeCreateTurnoFromMensaje(
       pacienteId = nuevoPaciente.id as string;
     }
 
+    // Evita duplicar el turno si varios mensajes seguidos siguen mencionando
+    // la palabra clave después de ya haber creado uno (ej. el paciente
+    // agradece o confirma) — mismo paciente, mismo origen, ventana de 6hs.
+    const seisHorasAtras = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    const { data: turnoReciente } = await sb
+      .from("turnos")
+      .select("id")
+      .eq("paciente_id", pacienteId)
+      .eq("origen", "ia_whatsapp")
+      .eq("estado", "pendiente")
+      .gte("created_at", seisHorasAtras)
+      .limit(1)
+      .maybeSingle();
+    if (turnoReciente) return;
+
     const fechaHora = new Date(
       `${interpretado.fecha}T${interpretado.hora}:00`,
     ).toISOString();
@@ -73,7 +106,7 @@ export async function maybeCreateTurnoFromMensaje(
       notas: interpretado.notas,
       origen: "ia_whatsapp",
       ia_confianza: interpretado.confianza,
-      ia_notas_originales: texto,
+      ia_notas_originales: textoParaInterpretar,
     });
     if (turnoError) {
       console.error("[turnosIA] no pude crear turno", turnoError);

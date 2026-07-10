@@ -2,8 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Channel } from "@/lib/channels";
 import { fetchProfile } from "@/lib/meta/profile";
 import type { ParsedMessengerWebhook } from "@/lib/meta/parseMessenger";
-import type { IngestNotification } from "@/lib/whatsapp/ingest";
 import { contactLabel, messagePreview } from "@/lib/format";
+
+export interface IngestNotification {
+  contactId: string;
+  title: string;
+  body: string;
+}
 
 // Ingest genérico por (channel, external_id) para Messenger/Instagram.
 // NO toca el ingest de WhatsApp (lib/whatsapp/ingest.ts). Escribe con service-role.
