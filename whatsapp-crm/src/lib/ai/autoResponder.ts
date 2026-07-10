@@ -34,11 +34,17 @@ function getClient(): Anthropic | null {
   return client;
 }
 
-function buildSystemPrompt(tenantNombre: string | null): string {
+function buildSystemPrompt(
+  tenantNombre: string | null,
+  profesionalNombre: string | null,
+): string {
   const nombre = tenantNombre?.trim() || "el consultorio";
+  const lineaProfesional = profesionalNombre
+    ? `\n\nEl único profesional que atiende acá es ${profesionalNombre}. No le preguntes al paciente con quién prefiere el turno ni le des a elegir — es siempre con ${profesionalNombre}, das eso por hecho.`
+    : "";
   return `Sos la recepción virtual por WhatsApp de ${nombre}, un profesional de salud en Argentina. Hablás en español rioplatense, con mensajes cortos y cordiales, estilo WhatsApp (sin firmar, sin markdown).
 
-Tu único trabajo es: saludar, entender qué necesita el paciente, y si pide un turno, ofrecerle anotarlo. Nunca digas que el turno quedó "confirmado" — siempre aclarás que queda pendiente de que el consultorio lo confirme (por ejemplo: "te lo anoto y te confirman a la brevedad").
+Tu único trabajo es: saludar, entender qué necesita el paciente, y si pide un turno, ofrecerle anotarlo. Nunca digas que el turno quedó "confirmado" — siempre aclarás que queda pendiente de que el consultorio lo confirme (por ejemplo: "te lo anoto y te confirman a la brevedad").${lineaProfesional}
 
 No intentes responder preguntas clínicas, precios, obra social, quejas, ni nada que no sea agendar o entender el motivo de la consulta. Si el paciente pregunta algo así, si pide explícitamente hablar con una persona, o si sentís que no podés ayudar más vos, respondé con un mensaje corto derivando ("te voy a derivar con alguien del consultorio para que te ayude mejor, en breve te responden") y marcá necesita_humano=true.
 
@@ -51,6 +57,7 @@ Si podés seguir ayudando con el triage/turno, marcá necesita_humano=false.`;
 // — nunca tira: el llamador es best-effort.
 export async function generateAutoReply(opts: {
   tenantNombre: string | null;
+  profesionalNombre: string | null;
   historial: AutoReplyTurno[];
 }): Promise<AutoReplyResult | null> {
   const anthropic = getClient();
@@ -60,7 +67,7 @@ export async function generateAutoReply(opts: {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,
-      system: buildSystemPrompt(opts.tenantNombre),
+      system: buildSystemPrompt(opts.tenantNombre, opts.profesionalNombre),
       messages: opts.historial.map((h) => ({
         role: h.role,
         content: h.content,

@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { TurnoConPaciente, TurnoEstado } from "@/lib/types";
+import type { TurnoConPaciente } from "@/lib/types";
 
 function formatFechaHora(iso: string): string {
   return new Date(iso).toLocaleString("es-AR", {
@@ -21,9 +22,35 @@ export default function TurnosPendientesIA({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [avisos, setAvisos] = useState<Record<string, string>>({});
 
-  async function resolver(id: string, estado: TurnoEstado) {
-    await supabase.from("turnos").update({ estado }).eq("id", id);
+  async function confirmar(id: string) {
+    setConfirmando(id);
+    try {
+      const res = await fetch("/api/turnos/confirmar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ turnoId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAvisos((prev) => ({ ...prev, [id]: data.error || "No se pudo confirmar el turno." }));
+        return;
+      }
+      if (data.warning) {
+        setAvisos((prev) => ({ ...prev, [id]: data.warning }));
+      }
+      router.refresh();
+    } catch {
+      setAvisos((prev) => ({ ...prev, [id]: "Error de red al confirmar." }));
+    } finally {
+      setConfirmando(null);
+    }
+  }
+
+  async function rechazar(id: string) {
+    await supabase.from("turnos").update({ estado: "cancelado" }).eq("id", id);
     router.refresh();
   }
 
@@ -53,16 +80,20 @@ export default function TurnosPendientesIA({
                   &quot;{t.ia_notas_originales}&quot;
                 </div>
               )}
+              {avisos[t.id] && (
+                <div className="text-[12px] text-warn">{avisos[t.id]}</div>
+              )}
             </div>
             <div className="flex shrink-0 gap-1.5">
               <button
-                onClick={() => resolver(t.id, "confirmado")}
-                className="rounded-full bg-ok/15 px-3 py-1 text-[12px] font-semibold text-ok"
+                onClick={() => confirmar(t.id)}
+                disabled={confirmando === t.id}
+                className="rounded-full bg-ok/15 px-3 py-1 text-[12px] font-semibold text-ok disabled:opacity-60"
               >
-                Confirmar
+                {confirmando === t.id ? "Confirmando…" : "Confirmar turno"}
               </button>
               <button
-                onClick={() => resolver(t.id, "cancelado")}
+                onClick={() => rechazar(t.id)}
                 className="rounded-full bg-danger/15 px-3 py-1 text-[12px] font-semibold text-danger"
               >
                 Rechazar

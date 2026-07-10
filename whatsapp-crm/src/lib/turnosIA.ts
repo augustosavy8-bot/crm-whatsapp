@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { interpretTurnoText } from "@/lib/ai/interpretTurno";
 import { pareceMencionarTurno } from "@/lib/ai/turnoKeywordFilter";
 import { sendPushToTenant } from "@/lib/push/send";
+import { getProfesionalUnico } from "@/lib/profesionales";
 
 interface Params {
   tenantId: string;
@@ -97,9 +98,14 @@ export async function maybeCreateTurnoFromMensaje(
       `${interpretado.fecha}T${interpretado.hora}:00`,
     ).toISOString();
 
+    // Si hay un solo profesional en el tenant, se asigna directo (no hace
+    // falta que el paciente elija entre opciones que no existen).
+    const profesionalUnico = await getProfesionalUnico(sb, tenantId);
+
     const { error: turnoError } = await sb.from("turnos").insert({
       tenant_id: tenantId,
       paciente_id: pacienteId,
+      profesional_id: profesionalUnico?.id ?? null,
       fecha_hora: fechaHora,
       duracion_min: interpretado.duracion_min ?? 30,
       estado: "pendiente",

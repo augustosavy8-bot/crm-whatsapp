@@ -3,6 +3,7 @@ import { generateAutoReply, type AutoReplyTurno } from "@/lib/ai/autoResponder";
 import { sendText } from "@/lib/whatsapp/meta";
 import { normalizeArPhone } from "@/lib/phone";
 import { sendPushToTenant } from "@/lib/push/send";
+import { getProfesionalUnico } from "@/lib/profesionales";
 
 // Tope duro de respuestas seguidas del bot en una misma conversación sin
 // que un humano intervenga: lo que pase primero entre esto y que la propia
@@ -54,7 +55,12 @@ export async function maybeAutoReply(
       return;
     }
 
-    const resultado = await generateAutoReply({ tenantNombre, historial });
+    const profesionalUnico = await getProfesionalUnico(sb, tenantId);
+    const resultado = await generateAutoReply({
+      tenantNombre,
+      profesionalNombre: profesionalUnico?.name ?? null,
+      historial,
+    });
     if (!resultado) return;
 
     const to = normalizeArPhone(contact.phone_number as string | null);
