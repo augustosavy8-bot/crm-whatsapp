@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const { data: turno, error: turnoErr } = await supabase
     .from("turnos")
     .select(
-      "id, tenant_id, fecha_hora, paciente:pacientes(id, nombre, contact_id), profesional:agents(id, name)",
+      "id, tenant_id, fecha_hora, paciente:pacientes(id, nombre, contact_id), profesional:agents(id, name), servicio:servicios(nombre)",
     )
     .eq("id", turnoId)
     .maybeSingle();
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     id: string;
     name: string | null;
   } | null;
+  const servicio = turno.servicio as unknown as { nombre: string } | null;
 
   const contactId = paciente?.contact_id ?? null;
   if (!contactId) {
@@ -103,8 +104,9 @@ export async function POST(request: NextRequest) {
   // Esta fecha va en el WhatsApp al paciente: sin timeZone se formateaba con
   // la zona del server (UTC en Vercel) y le llegaba 3hs corrida.
   const fechaTxt = formatArFechaHora(turno.fecha_hora as string);
+  const servicioTxt = servicio?.nombre ? ` de ${servicio.nombre}` : "";
   const profesionalTxt = profesional?.name ? ` con ${profesional.name}` : "";
-  const mensaje = `¡Tu turno${profesionalTxt} quedó confirmado para el ${fechaTxt}hs! Te esperamos.`;
+  const mensaje = `¡Tu turno${servicioTxt}${profesionalTxt} quedó confirmado para el ${fechaTxt}hs! Te esperamos.`;
 
   const to = normalizeArPhone(contact.phone_number as string | null);
   const envio = await sendText(phoneNumberId, accessToken, to, mensaje);

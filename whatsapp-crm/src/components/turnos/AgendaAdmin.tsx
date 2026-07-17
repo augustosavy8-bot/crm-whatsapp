@@ -107,6 +107,26 @@ export default function AgendaAdmin({
   }, [cargar]);
 
   async function cambiarEstado(id: string, estado: TurnoEstado) {
+    // Confirmar pasa por la ruta que además le avisa al paciente por WhatsApp
+    // (mismo flujo que la tarjeta de pendientes de IA), no por un update directo.
+    if (estado === "confirmado") {
+      const res = await fetch("/api/turnos/confirmar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ turnoId: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "No se pudo confirmar el turno.");
+        return;
+      }
+      // El turno quedó confirmado igual; el warning avisa si NO se pudo mandar
+      // el WhatsApp (sin contacto vinculado, ventana de 24hs cerrada, etc.).
+      if (data.warning) alert(data.warning);
+      cargar();
+      return;
+    }
+
     const { error } = await supabase.from("turnos").update({ estado }).eq("id", id);
     if (error) {
       alert(
