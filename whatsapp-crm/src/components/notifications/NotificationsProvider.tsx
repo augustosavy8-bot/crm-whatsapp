@@ -146,6 +146,10 @@ export default function NotificationsProvider({
           const msg = payload.new as Message;
           if (msg.direction !== "inbound") return;
 
+          // Aviso visual (aditivo): el avatar flotante escucha este evento
+          // para reaccionar a mensajes nuevos, sin abrir otro canal Realtime.
+          window.dispatchEvent(new CustomEvent("foko:new-message"));
+
           if (!mutedRef.current) playBeep();
 
           const away = document.hidden || !document.hasFocus();
