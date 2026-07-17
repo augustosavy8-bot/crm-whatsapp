@@ -39,7 +39,10 @@ export async function updateSession(request: NextRequest) {
     path === "/login" ||
     path.startsWith("/auth") ||
     path === "/privacy" ||
-    path.startsWith("/privacy/");
+    path.startsWith("/privacy/") ||
+    // Landing y reserva del gimnasio: cara al público, sin login.
+    path === "/gimnasio" ||
+    path.startsWith("/gimnasio/");
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

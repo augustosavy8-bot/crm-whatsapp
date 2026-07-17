@@ -1,17 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { TurnoConPaciente, Turno } from "./types";
+import { arLocalToUtc, hoyISOArgentina } from "./tz";
+import type { TurnoConPaciente, TurnoConDetalle, Turno } from "./types";
 
-// Próximos turnos (desde hoy 00:00) con datos mínimos del paciente, para la agenda.
+// Próximos turnos (desde hoy 00:00 de Buenos Aires) con datos mínimos del
+// paciente, para la agenda. Ojo: `setHours(0,0,0,0)` sería medianoche del
+// runtime — en Vercel (UTC) arrancaba a las 21hs del día anterior en AR.
 export async function getTurnosProximos(
   sb: SupabaseClient,
 ): Promise<TurnoConPaciente[]> {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  const startOfToday = arLocalToUtc(hoyISOArgentina(), "00:00");
 
   const { data, error } = await sb
     .from("turnos")
     .select("*, paciente:pacientes(id, nombre, telefono)")
-    .gte("fecha_hora", startOfToday.toISOString())
+    .gte("fecha_hora", startOfToday)
     .order("fecha_hora", { ascending: true });
   if (error) throw error;
   return (data ?? []) as unknown as TurnoConPaciente[];
@@ -29,6 +31,25 @@ export async function getTurnosPendientesIA(
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as TurnoConPaciente[];
+}
+
+// Turnos en un rango [desde, hasta) con paciente, servicio y profesional,
+// para la agenda del panel admin (vista día/semana). Ambos límites en ISO UTC.
+export async function getTurnosEnRango(
+  sb: SupabaseClient,
+  desdeISO: string,
+  hastaISO: string,
+): Promise<TurnoConDetalle[]> {
+  const { data, error } = await sb
+    .from("turnos")
+    .select(
+      "*, paciente:pacientes(id, nombre, telefono), servicio:servicios(id, nombre), profesional:agents(id, name)",
+    )
+    .gte("fecha_hora", desdeISO)
+    .lt("fecha_hora", hastaISO)
+    .order("fecha_hora", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as TurnoConDetalle[];
 }
 
 export async function getTurnosByPaciente(

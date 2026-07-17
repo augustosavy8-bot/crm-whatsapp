@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { arDateKey, formatArFecha, formatArHora, hoyISOArgentina } from "@/lib/tz";
 import type { TurnoConPaciente, TurnoEstado } from "@/lib/types";
 
 const ESTADOS: TurnoEstado[] = [
@@ -28,29 +29,18 @@ const ESTADO_COLOR: Record<TurnoEstado, string> = {
   ausente: "bg-danger/15 text-danger",
 };
 
-function formatHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es-AR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
+// "Hoy"/"Mañana" se comparan contra el día de Buenos Aires, no contra el del
+// device: si no, cerca de medianoche un turno cae en el día equivocado.
 function formatDiaLabel(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(today.getDate() + 1);
-  const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-  if (sameDay(d, today)) return "Hoy";
-  if (sameDay(d, tomorrow)) return "Mañana";
-  return d.toLocaleDateString("es-AR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-  });
+  const key = arDateKey(iso);
+  const hoy = hoyISOArgentina();
+  if (key === hoy) return "Hoy";
+
+  const manana = new Date(`${hoy}T12:00:00Z`);
+  manana.setUTCDate(manana.getUTCDate() + 1);
+  if (key === manana.toISOString().slice(0, 10)) return "Mañana";
+
+  return formatArFecha(iso);
 }
 
 export default function TurnosAgenda({
@@ -76,7 +66,7 @@ export default function TurnosAgenda({
 
   const groups = new Map<string, TurnoConPaciente[]>();
   for (const t of turnos) {
-    const key = new Date(t.fecha_hora).toDateString();
+    const key = arDateKey(t.fecha_hora);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(t);
   }
@@ -98,7 +88,7 @@ export default function TurnosAgenda({
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 text-[15px] font-semibold">
                       <span>
-                        {formatHora(t.fecha_hora)} · {t.paciente?.nombre ?? "—"}
+                        {formatArHora(t.fecha_hora)} · {t.paciente?.nombre ?? "—"}
                       </span>
                       {t.origen !== "manual" && (
                         <span

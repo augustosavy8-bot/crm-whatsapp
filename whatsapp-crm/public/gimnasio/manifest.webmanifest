@@ -1,0 +1,15 @@
+{
+  "id": "/gimnasio",
+  "name": "Mi Gimnasio",
+  "short_name": "Gimnasio",
+  "description": "Reservá tus turnos de kinesiología, nutrición y entrenamiento.",
+  "start_url": "/gimnasio",
+  "scope": "/gimnasio",
+  "display": "standalone",
+  "background_color": "#f1f0ed",
+  "theme_color": "#f0552d",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

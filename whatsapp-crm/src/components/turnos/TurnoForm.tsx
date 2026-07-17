@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { arLocalToUtc } from "@/lib/tz";
 import type { InterpretedTurno } from "@/lib/types";
 
 interface PacienteOption {
@@ -103,7 +104,9 @@ export default function TurnoForm({
     }
     setSaving(true);
     try {
-      const fechaHora = new Date(`${fecha}T${hora}`).toISOString();
+      // El staff carga hora de Buenos Aires. Esto daba bien solo porque el
+      // device está en AR; explícito, no depende de la zona del browser.
+      const fechaHora = arLocalToUtc(fecha, hora);
       const { error } = await supabase.from("turnos").insert({
         tenant_id: tenantId,
         paciente_id: pacienteId,

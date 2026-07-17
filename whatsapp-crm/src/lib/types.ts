@@ -141,8 +141,55 @@ export type TurnoEstado =
   | "atendido"
   | "ausente";
 
-export type TurnoOrigen = "manual" | "ia_whatsapp" | "ia_manual";
+export type TurnoOrigen = "manual" | "ia_whatsapp" | "ia_manual" | "web";
 export type IaConfianza = "alta" | "media" | "baja";
+
+// --- Módulo de reservas del gimnasio (migración 0019) ---
+
+export interface Servicio {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  slug: string;
+  descripcion: string | null;
+  duracion_min: number;
+  profesional_id: string | null;
+  activo: boolean;
+  orden: number;
+  created_at: string;
+}
+
+// Servicio + nombre del profesional, para la landing/reserva pública.
+// Solo datos no sensibles.
+export interface ServicioPublico {
+  id: string;
+  nombre: string;
+  slug: string;
+  descripcion: string | null;
+  duracion_min: number;
+  profesional_nombre: string | null;
+}
+
+export interface ProfesionalHorario {
+  id: string;
+  tenant_id: string;
+  profesional_id: string;
+  dia_semana: number; // 0=domingo .. 6=sábado
+  hora_inicio: string; // "HH:MM:SS"
+  hora_fin: string;
+  activo: boolean;
+  created_at: string;
+}
+
+export interface ProfesionalBloqueo {
+  id: string;
+  tenant_id: string;
+  profesional_id: string;
+  desde: string; // timestamptz ISO
+  hasta: string;
+  motivo: string | null;
+  created_at: string;
+}
 
 export interface Turno {
   id: string;
@@ -150,7 +197,9 @@ export interface Turno {
   paciente_id: string;
   profesional_id: string | null;
   fecha_hora: string;
+  fecha_fin: string | null;
   duracion_min: number;
+  servicio_id: string | null;
   estado: TurnoEstado;
   notas: string | null;
   recordatorio_enviado_at: string | null;
@@ -175,6 +224,13 @@ export interface InterpretedTurno {
 // Turno + datos del paciente para listar sin joins manuales en la UI.
 export interface TurnoConPaciente extends Turno {
   paciente: Pick<Paciente, "id" | "nombre" | "telefono"> | null;
+}
+
+// Turno + paciente + servicio + profesional, para la agenda admin.
+export interface TurnoConDetalle extends Turno {
+  paciente: Pick<Paciente, "id" | "nombre" | "telefono"> | null;
+  servicio: Pick<Servicio, "id" | "nombre"> | null;
+  profesional: { id: string; name: string | null } | null;
 }
 
 export interface HistoriaClinica {

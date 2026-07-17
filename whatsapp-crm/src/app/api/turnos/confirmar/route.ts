@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendText } from "@/lib/whatsapp/meta";
 import { normalizeArPhone } from "@/lib/phone";
 import { isWindowOpen } from "@/lib/window";
+import { formatArFechaHora } from "@/lib/tz";
 
 // Confirma un turno y, si el paciente tiene un contacto de WhatsApp vinculado
 // y la ventana de 24hs sigue abierta, le manda un mensaje avisándole.
@@ -99,13 +100,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const fechaTxt = new Date(turno.fecha_hora as string).toLocaleString("es-AR", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Esta fecha va en el WhatsApp al paciente: sin timeZone se formateaba con
+  // la zona del server (UTC en Vercel) y le llegaba 3hs corrida.
+  const fechaTxt = formatArFechaHora(turno.fecha_hora as string);
   const profesionalTxt = profesional?.name ? ` con ${profesional.name}` : "";
   const mensaje = `¡Tu turno${profesionalTxt} quedó confirmado para el ${fechaTxt}hs! Te esperamos.`;
 

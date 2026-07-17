@@ -3,6 +3,7 @@ import { interpretTurnoText } from "@/lib/ai/interpretTurno";
 import { pareceMencionarTurno } from "@/lib/ai/turnoKeywordFilter";
 import { sendPushToTenant } from "@/lib/push/send";
 import { getProfesionalUnico } from "@/lib/profesionales";
+import { arLocalToUtc, formatArFecha, hoyISOArgentina } from "@/lib/tz";
 
 interface Params {
   tenantId: string;
@@ -41,9 +42,7 @@ export async function maybeCreateTurnoFromMensaje(
       .join("\n");
     const textoParaInterpretar = historialTexto || texto;
 
-    const hoyISO = new Date().toLocaleDateString("en-CA", {
-      timeZone: "America/Argentina/Buenos_Aires",
-    }); // en-CA -> YYYY-MM-DD
+    const hoyISO = hoyISOArgentina();
     const interpretado = await interpretTurnoText(textoParaInterpretar, { hoyISO });
     if (!interpretado || !interpretado.es_pedido_turno) return;
     if (!interpretado.fecha || !interpretado.hora) return;
@@ -97,9 +96,9 @@ export async function maybeCreateTurnoFromMensaje(
       .maybeSingle();
     if (turnoReciente) return;
 
-    const fechaHora = new Date(
-      `${interpretado.fecha}T${interpretado.hora}:00`,
-    ).toISOString();
+    // La IA devuelve wall-clock de Buenos Aires. Sin arLocalToUtc esto se
+    // parseaba en la zona del runtime (UTC en Vercel) y guardaba 3hs corridas.
+    const fechaHora = arLocalToUtc(interpretado.fecha, interpretado.hora);
 
     // Si hay un solo profesional en el tenant, se asigna directo (no hace
     // falta que el paciente elija entre opciones que no existen).
@@ -127,7 +126,7 @@ export async function maybeCreateTurnoFromMensaje(
       .select("nombre")
       .eq("id", pacienteId)
       .maybeSingle();
-    const fechaCorta = new Date(fechaHora).toLocaleDateString("es-AR", {
+    const fechaCorta = formatArFecha(fechaHora, {
       day: "2-digit",
       month: "2-digit",
     });

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { interpretTurnoText } from "@/lib/ai/interpretTurno";
+import { hoyISOArgentina } from "@/lib/tz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,9 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Falta el texto" }, { status: 400 });
   }
 
-  const hoyISO = new Date().toLocaleDateString("en-CA", {
-    timeZone: "America/Argentina/Buenos_Aires",
-  });
+  const hoyISO = hoyISOArgentina();
   const interpretado = await interpretTurnoText(texto, { hoyISO });
   if (!interpretado) {
     return NextResponse.json(
