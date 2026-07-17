@@ -36,6 +36,7 @@ export async function updateSession(request: NextRequest) {
   // (El matcher de proxy.ts ya excluye /api y assets estáticos.)
   const path = request.nextUrl.pathname;
   const isPublic =
+    path === "/" || // la raíz decide sola: público -> /gimnasio, staff -> /dashboard
     path === "/login" ||
     path.startsWith("/auth") ||
     path === "/privacy" ||
