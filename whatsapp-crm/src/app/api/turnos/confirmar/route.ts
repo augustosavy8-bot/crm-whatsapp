@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentAgent } from "@/lib/agent";
 import { sendText } from "@/lib/whatsapp/meta";
 import { normalizeArPhone } from "@/lib/phone";
 import { isWindowOpen } from "@/lib/window";
@@ -13,10 +14,8 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const agent = await getCurrentAgent(supabase);
+  if (!agent) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
   const { data: turno, error: turnoErr } = await supabase
     .from("turnos")
     .select(
-      "id, tenant_id, fecha_hora, paciente:pacientes(id, nombre, contact_id), profesional:agents(id, name), servicio:servicios(nombre)",
+      "id, tenant_id, fecha_hora, profesional_id, paciente:pacientes(id, nombre, contact_id), profesional:agents(id, name), servicio:servicios(nombre)",
     )
     .eq("id", turnoId)
     .maybeSingle();
@@ -42,7 +41,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: turnoErr.message }, { status: 500 });
   }
   if (!turno) {
+    // RLS ya oculta los turnos ajenos a un profesional (esto le llega como 404).
     return NextResponse.json({ error: "Turno no encontrado" }, { status: 404 });
+  }
+
+  // Defensa en profundidad sobre la RLS: un profesional solo puede confirmar
+  // (y por ende disparar el WhatsApp de) sus propios turnos. El owner, todos.
+  if (agent.role === "profesional" && turno.profesional_id !== agent.id) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   const { error: updateErr } = await supabase

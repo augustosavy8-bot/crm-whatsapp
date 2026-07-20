@@ -15,8 +15,10 @@ export default async function ConfiguracionPage() {
   const agent = await getCurrentAgent(supabase);
   if (!agent) redirect("/login");
 
+  const esOwner = agent.role !== "profesional";
+
   const [servicios, profesionales, horarios, bloqueos] = await Promise.all([
-    getServiciosAdmin(supabase),
+    esOwner ? getServiciosAdmin(supabase) : Promise.resolve([]),
     getProfesionales(supabase),
     getHorarios(supabase),
     getBloqueosFuturos(supabase),
@@ -42,6 +44,7 @@ export default async function ConfiguracionPage() {
 
         <ConfiguracionReservas
           tenantId={agent.tenant_id}
+          esOwner={esOwner}
           servicios={servicios}
           profesionales={profesionales}
           horarios={horarios}

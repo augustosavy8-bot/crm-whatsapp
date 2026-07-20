@@ -19,21 +19,48 @@ export default async function TurnosPage({
   const agent = await getCurrentAgent(supabase);
   if (!agent) redirect("/login");
 
-  const [pendientesIA, pacientes, profesionales, { data: agentes }] =
+  const esProfesional = agent.role === "profesional";
+
+  // Para el profesional, todo se fuerza a sí mismo: sin selector de profesional
+  // (RLS ya lo aisla, pero evitamos mostrar/ofrecer a los demás), y su servicio
+  // para el título. Los owners ven la agenda completa como hasta ahora.
+  const [pendientesIA, pacientes, profesionales, { data: agentes }, servicioProp] =
     await Promise.all([
-      getTurnosPendientesIA(supabase),
+      esProfesional
+        ? Promise.resolve([])
+        : getTurnosPendientesIA(supabase),
       getPacientes(supabase),
-      getProfesionales(supabase),
-      supabase.from("agents").select("id, name, email"),
+      esProfesional
+        ? Promise.resolve([{ id: agent.id, name: agent.name }])
+        : getProfesionales(supabase),
+      esProfesional
+        ? Promise.resolve({ data: [{ id: agent.id, name: agent.name, email: agent.email }] })
+        : supabase.from("agents").select("id, name, email"),
+      esProfesional
+        ? supabase
+            .from("servicios")
+            .select("nombre")
+            .eq("profesional_id", agent.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
+
+  const servicioNombre =
+    (servicioProp?.data as { nombre?: string } | null)?.nombre ?? null;
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Turnos</h1>
-            <p className="text-sm text-muted">Agenda del día y de la semana.</p>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {esProfesional ? `Agenda de ${agent.name ?? "mis turnos"}` : "Turnos"}
+            </h1>
+            <p className="text-sm text-muted">
+              {esProfesional && servicioNombre
+                ? `${servicioNombre} · día y semana.`
+                : "Agenda del día y de la semana."}
+            </p>
           </div>
           <Link
             href="/turnos/configuracion"
@@ -43,7 +70,7 @@ export default async function TurnosPage({
           </Link>
         </div>
 
-        <TurnosPendientesIA turnos={pendientesIA} />
+        {!esProfesional && <TurnosPendientesIA turnos={pendientesIA} />}
 
         <NuevoTurnoPanel
           tenantId={agent.tenant_id}

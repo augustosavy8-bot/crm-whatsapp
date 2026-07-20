@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentAgent } from "@/lib/agent";
 
-// La raíz separa los dos mundos: el público del gimnasio va a la landing, el
-// staff logueado va a su panel. Así un cliente que entra al dominio pelado
-// nunca ve el login del CRM.
+// La raíz separa los mundos por rol:
+//   público (sin sesión) -> landing del gimnasio
+//   profesional          -> su agenda
+//   owner                -> panel del CRM
 export default async function Home() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  redirect(user ? "/dashboard" : "/gimnasio");
+  const agent = await getCurrentAgent(supabase);
+  if (!agent) redirect("/gimnasio");
+  redirect(agent.role === "profesional" ? "/turnos" : "/dashboard");
 }

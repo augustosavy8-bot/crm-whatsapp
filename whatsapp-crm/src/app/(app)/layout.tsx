@@ -19,11 +19,22 @@ export default async function AppLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { count: pendientesIA } = await supabase
-    .from("turnos")
-    .select("id", { count: "exact", head: true })
-    .eq("estado", "pendiente")
-    .neq("origen", "manual");
+  const { data: agente } = await supabase
+    .from("agents")
+    .select("role")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  const esProfesional = agente?.role === "profesional";
+
+  // El profesional no tiene inbox ni pendientes de IA (solo ve turnos suyos);
+  // el avatar/contador del CRM no aplica.
+  const { count: pendientesIA } = esProfesional
+    ? { count: 0 }
+    : await supabase
+        .from("turnos")
+        .select("id", { count: "exact", head: true })
+        .eq("estado", "pendiente")
+        .neq("origen", "manual");
 
   return (
     <NotificationsProvider>
@@ -37,18 +48,18 @@ export default async function AppLayout({
             WhatsApp CRM
           </span>
         </div>
-        <HeaderNav />
+        <HeaderNav role={agente?.role} />
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="hidden text-xs text-muted lg:block">
             {user.email}
           </span>
-          <PushButton />
-          <NotificationBell />
+          {!esProfesional && <PushButton />}
+          {!esProfesional && <NotificationBell />}
           <SignOutButton />
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
-      <AIAvatar pendientesCount={pendientesIA ?? 0} />
+      {!esProfesional && <AIAvatar pendientesCount={pendientesIA ?? 0} />}
     </div>
     </NotificationsProvider>
   );

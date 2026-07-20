@@ -23,12 +23,14 @@ function hhmm(t: string): string {
 
 export default function ConfiguracionReservas({
   tenantId,
+  esOwner,
   servicios,
   profesionales,
   horarios,
   bloqueos,
 }: {
   tenantId: string;
+  esOwner: boolean;
   servicios: ServicioConProfesional[];
   profesionales: ProfesionalConNombre[];
   horarios: ProfesionalHorario[];
@@ -41,11 +43,15 @@ export default function ConfiguracionReservas({
 
   return (
     <div className="space-y-8">
-      <ServiciosSection
-        servicios={servicios}
-        supabase={supabase}
-        onChange={() => router.refresh()}
-      />
+      {/* Servicios (duración, activo) es del owner; el profesional solo edita
+          sus horarios y bloqueos. */}
+      {esOwner && (
+        <ServiciosSection
+          servicios={servicios}
+          supabase={supabase}
+          onChange={() => router.refresh()}
+        />
+      )}
       <HorariosSection
         tenantId={tenantId}
         profesionales={profesionales}

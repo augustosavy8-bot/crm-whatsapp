@@ -51,5 +51,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Guard por rol: un profesional solo tiene el módulo de turnos. Todo lo
+  // demás (dashboard, inbox, pacientes, la raíz) lo mandamos a /turnos. La
+  // seguridad real es RLS; esto es para que ni vea el chrome del CRM.
+  if (user) {
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const appRole = claimsData?.claims?.app_role as string | undefined;
+    if (appRole === "profesional") {
+      const enTurnos = path === "/turnos" || path.startsWith("/turnos/");
+      if (!enTurnos) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/turnos";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   return response;
 }
