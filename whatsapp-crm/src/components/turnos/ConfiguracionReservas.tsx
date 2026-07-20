@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatArFechaHora } from "@/lib/tz";
 import { arLocalToUtc } from "@/lib/tz";
+import {
+  contarCanceladosViejos,
+  eliminarCanceladosViejos,
+} from "@/lib/turnos";
 import type {
   ProfesionalHorario,
   ProfesionalBloqueo,
@@ -67,7 +71,91 @@ export default function ConfiguracionReservas({
         supabase={supabase}
         onChange={() => router.refresh()}
       />
+      {/* Purga de cancelados: delete real, solo owner. La RLS igual impide el
+          delete a los profesionales. */}
+      {esOwner && <PurgaCanceladosSection supabase={supabase} />}
     </div>
+  );
+}
+
+// --- Purga de turnos cancelados viejos (owner) ---
+function PurgaCanceladosSection({ supabase }: { supabase: SB }) {
+  const [meses, setMeses] = useState(6);
+  const [estado, setEstado] = useState<"idle" | "contando" | "borrando">("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function purgar() {
+    setMsg(null);
+    setEstado("contando");
+    let cuantos = 0;
+    try {
+      cuantos = await contarCanceladosViejos(supabase, meses);
+    } catch (e) {
+      setEstado("idle");
+      setMsg(`No se pudo consultar: ${(e as Error).message}`);
+      return;
+    }
+    setEstado("idle");
+
+    if (cuantos === 0) {
+      setMsg(`No hay turnos cancelados de más de ${meses} meses.`);
+      return;
+    }
+    const ok = window.confirm(
+      `Se van a eliminar ${cuantos} turno(s) cancelado(s) de más de ${meses} ` +
+        `meses. Esta acción no se puede deshacer. ¿Continuar?`,
+    );
+    if (!ok) return;
+
+    setEstado("borrando");
+    try {
+      const borrados = await eliminarCanceladosViejos(supabase, meses);
+      setMsg(`Listo: se eliminaron ${borrados} turno(s) cancelado(s).`);
+    } catch (e) {
+      setMsg(`No se pudo eliminar: ${(e as Error).message}`);
+    } finally {
+      setEstado("idle");
+    }
+  }
+
+  const trabajando = estado !== "idle";
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-lg font-bold tracking-tight">Limpieza de cancelados</h2>
+        <p className="text-sm text-muted">
+          Elimina definitivamente los turnos cancelados más viejos. El resto de
+          los turnos (y el historial de cada paciente) no se toca.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-panel border border-line bg-surface-2 p-3">
+        <label className="flex items-center gap-1.5 text-[13px] text-muted">
+          Más de
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={meses}
+            onChange={(e) => setMeses(Math.max(1, Number(e.target.value) || 1))}
+            className="w-16 rounded-lg border border-line bg-surface px-2 py-1 text-right text-ink outline-none focus:border-accent"
+          />
+          meses
+        </label>
+        <button
+          onClick={purgar}
+          disabled={trabajando}
+          className="rounded-full bg-danger px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-danger/90 disabled:opacity-60"
+        >
+          {estado === "contando"
+            ? "Contando…"
+            : estado === "borrando"
+              ? "Eliminando…"
+              : "Eliminar cancelados"}
+        </button>
+        {msg && <p className="w-full text-[13px] text-muted">{msg}</p>}
+      </div>
+    </section>
   );
 }
 

@@ -4,7 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent } from "@/lib/agent";
 import { getTurnosPendientesIA } from "@/lib/turnos";
 import { getPacientes } from "@/lib/pacientes";
-import { getProfesionales } from "@/lib/reservas";
+import {
+  getProfesionales,
+  getHorarios,
+  getBloqueosFuturos,
+} from "@/lib/reservas";
 import AgendaAdmin from "@/components/turnos/AgendaAdmin";
 import TurnosPendientesIA from "@/components/turnos/TurnosPendientesIA";
 import NuevoTurnoPanel from "@/components/turnos/NuevoTurnoPanel";
@@ -24,8 +28,15 @@ export default async function TurnosPage({
   // Para el profesional, todo se fuerza a sí mismo: sin selector de profesional
   // (RLS ya lo aisla, pero evitamos mostrar/ofrecer a los demás), y su servicio
   // para el título. Los owners ven la agenda completa como hasta ahora.
-  const [pendientesIA, pacientes, profesionales, { data: agentes }, servicioProp] =
-    await Promise.all([
+  const [
+    pendientesIA,
+    pacientes,
+    profesionales,
+    { data: agentes },
+    servicioProp,
+    horarios,
+    bloqueos,
+  ] = await Promise.all([
       esProfesional
         ? Promise.resolve([])
         : getTurnosPendientesIA(supabase),
@@ -43,6 +54,10 @@ export default async function TurnosPage({
             .eq("profesional_id", agent.id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      // Para avisar en el modal de reprogramación si el destino cae fuera del
+      // horario habitual o sobre un bloqueo (RLS ya scopea al profesional).
+      getHorarios(supabase),
+      getBloqueosFuturos(supabase),
     ]);
 
   const servicioNombre =
@@ -80,7 +95,11 @@ export default async function TurnosPage({
           defaultPacienteId={pacientePreseleccionado}
         />
 
-        <AgendaAdmin profesionales={profesionales} />
+        <AgendaAdmin
+          profesionales={profesionales}
+          horarios={horarios}
+          bloqueos={bloqueos}
+        />
       </div>
     </div>
   );

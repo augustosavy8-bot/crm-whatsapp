@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getModulosTenant } from "@/lib/modulos";
 
 // Refresca la sesión de Supabase en cada request y reescribe las cookies.
 // (La protección de rutas / redirect a /login se agrega en la Fase 2.)
@@ -64,6 +65,25 @@ export async function updateSession(request: NextRequest) {
         url.pathname = "/turnos";
         url.search = "";
         return NextResponse.redirect(url);
+      }
+    } else {
+      // Owner/secretaria: si el tenant no tiene el módulo inbox, las rutas del
+      // CRM de mensajería (inbox + dashboard de mensajes) van a /turnos. Solo
+      // consultamos la tabla cuando la ruta es una de esas: no un query por
+      // request. La seguridad real es RLS; esto es para no ver el chrome.
+      const enInbox =
+        path === "/inbox" ||
+        path.startsWith("/inbox/") ||
+        path === "/dashboard" ||
+        path.startsWith("/dashboard/");
+      if (enInbox) {
+        const { inbox } = await getModulosTenant(supabase);
+        if (!inbox) {
+          const url = request.nextUrl.clone();
+          url.pathname = "/turnos";
+          url.search = "";
+          return NextResponse.redirect(url);
+        }
       }
     }
   }

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getModulosTenant } from "@/lib/modulos";
 import SignOutButton from "@/components/SignOutButton";
 import HeaderNav from "@/components/HeaderNav";
 import NotificationsProvider from "@/components/notifications/NotificationsProvider";
@@ -26,6 +27,17 @@ export default async function AppLayout({
     .maybeSingle();
   const esProfesional = agente?.role === "profesional";
 
+  // Módulos del tenant: una sola lectura por request, se baja por props.
+  // El profesional tiene nav fijo (solo su agenda), no depende de esto.
+  const modulos = esProfesional
+    ? { inbox: false, turnos: true }
+    : await getModulosTenant(supabase);
+
+  // El chrome de mensajería (bell, push, toasts/beeps Realtime) es parte del
+  // módulo inbox: si el tenant no lo tiene, no se monta. El webhook, el envío
+  // y la publicación Realtime del backend siguen intactos: esto es solo UI.
+  const mostrarChromeInbox = !esProfesional && modulos.inbox;
+
   // El profesional no tiene inbox ni pendientes de IA (solo ve turnos suyos);
   // el avatar/contador del CRM no aplica.
   const { count: pendientesIA } = esProfesional
@@ -36,8 +48,7 @@ export default async function AppLayout({
         .eq("estado", "pendiente")
         .neq("origen", "manual");
 
-  return (
-    <NotificationsProvider>
+  const contenido = (
     <div className="flex h-[100dvh] flex-col bg-canvas">
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-4 py-2.5">
         <div className="flex items-center gap-2">
@@ -48,19 +59,26 @@ export default async function AppLayout({
             WhatsApp CRM
           </span>
         </div>
-        <HeaderNav role={agente?.role} />
+        <HeaderNav role={agente?.role} inboxEnabled={modulos.inbox} />
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="hidden text-xs text-muted lg:block">
             {user.email}
           </span>
-          {!esProfesional && <PushButton />}
-          {!esProfesional && <NotificationBell />}
+          {mostrarChromeInbox && <PushButton />}
+          {mostrarChromeInbox && <NotificationBell />}
           <SignOutButton />
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
       {!esProfesional && <AIAvatar pendientesCount={pendientesIA ?? 0} />}
     </div>
-    </NotificationsProvider>
+  );
+
+  // NotificationsProvider (Realtime de mensajes entrantes + toasts/beeps) es
+  // chrome del inbox: solo se monta si el tenant tiene el módulo.
+  return mostrarChromeInbox ? (
+    <NotificationsProvider>{contenido}</NotificationsProvider>
+  ) : (
+    contenido
   );
 }

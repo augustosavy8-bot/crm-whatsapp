@@ -10,15 +10,33 @@ const ITEMS_OWNER = [
   { href: "/turnos", label: "Turnos" },
 ];
 
+// Owner sin módulo de inbox: desaparece el CRM de mensajería (Inbox y el
+// dashboard de mensajes) y la Agenda pasa a ser el home.
+const ITEMS_OWNER_SIN_INBOX = [
+  { href: "/turnos", label: "Agenda" },
+  { href: "/pacientes", label: "Pacientes" },
+];
+
 // El profesional solo tiene su módulo de turnos.
 const ITEMS_PROFESIONAL = [
   { href: "/turnos", label: "Agenda" },
   { href: "/turnos/configuracion", label: "Configuración" },
 ];
 
-export default function HeaderNav({ role }: { role?: string }) {
+export default function HeaderNav({
+  role,
+  inboxEnabled = true,
+}: {
+  role?: string;
+  inboxEnabled?: boolean;
+}) {
   const path = usePathname();
-  const ITEMS = role === "profesional" ? ITEMS_PROFESIONAL : ITEMS_OWNER;
+  const ITEMS =
+    role === "profesional"
+      ? ITEMS_PROFESIONAL
+      : inboxEnabled
+        ? ITEMS_OWNER
+        : ITEMS_OWNER_SIN_INBOX;
   return (
     <nav className="flex items-center gap-1 rounded-full bg-surface-2 p-1">
       {ITEMS.map((it) => {

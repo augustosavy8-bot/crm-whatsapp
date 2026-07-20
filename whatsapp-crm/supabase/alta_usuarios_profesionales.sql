@@ -67,6 +67,8 @@ begin
     );
   end if;
 
+  update public.agents set email = p_email where id = p_agent_id;
+
   -- El vínculo es lo que hace que el hook resuelva tenant_id/app_role/agent_id.
   update public.agents set auth_user_id = v_user_id where id = p_agent_id;
 
@@ -87,9 +89,9 @@ begin
   select id into v_lis     from public.agents where role = 'profesional' and (name ilike '%lis%' or name ilike '%ponzio%') limit 1;
   select id into v_gian    from public.agents where role = 'profesional' and (name ilike '%gian%' or name ilike '%orlandi%') limit 1;
 
-  perform public._alta_profesional(v_mariano, 'mariano@gimnasio.com', 'CAMBIAR_ESTA_CLAVE_1');
-  perform public._alta_profesional(v_lis,     'lis@gimnasio.com',     'CAMBIAR_ESTA_CLAVE_2');
-  perform public._alta_profesional(v_gian,    'gian@gimnasio.com',    'CAMBIAR_ESTA_CLAVE_3');
+  perform public._alta_profesional(v_mariano, 'mariano@kine.com', 'kine1234');
+  perform public._alta_profesional(v_lis,     'lis@nutri.com',     'nutri1234');
+  perform public._alta_profesional(v_gian,    'gian@gimnasio.com',    'gimnasio1234');
 end $$;
 
 -- Limpieza del helper (no lo dejamos colgado en la base).
