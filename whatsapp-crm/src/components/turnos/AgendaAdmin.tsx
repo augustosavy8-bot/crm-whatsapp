@@ -16,7 +16,6 @@ import {
 } from "@dnd-kit/core";
 import { createClient } from "@/lib/supabase/client";
 import { getTurnosEnRango } from "@/lib/turnos";
-import { normalizeArPhone } from "@/lib/phone";
 import {
   AR_TZ,
   arLocalToUtc,
@@ -24,36 +23,19 @@ import {
   formatArHora,
   formatArFecha,
   hoyISOArgentina,
+  sumarDiasISO,
+  diaSemanaISO,
 } from "@/lib/tz";
+import { ESTADOS, ESTADO_LABEL, ESTADO_COLOR } from "@/lib/turnoEstado";
+import { confirmarTurnoApi, waReprogramadoUrl } from "@/lib/turnosAcciones";
+import { Toast, type ToastState } from "./Toast";
 import type {
   TurnoConDetalle,
   TurnoEstado,
   ProfesionalHorario,
   ProfesionalBloqueo,
 } from "@/lib/types";
-import type { ProfesionalConNombre } from "@/lib/reservas";
 
-const ESTADOS: TurnoEstado[] = [
-  "pendiente",
-  "confirmado",
-  "cancelado",
-  "atendido",
-  "ausente",
-];
-const ESTADO_LABEL: Record<TurnoEstado, string> = {
-  pendiente: "Pendiente",
-  confirmado: "Confirmado",
-  cancelado: "Cancelado",
-  atendido: "Atendió",
-  ausente: "No asistió",
-};
-const ESTADO_COLOR: Record<TurnoEstado, string> = {
-  pendiente: "bg-warn/15 text-warn",
-  confirmado: "bg-ok/15 text-ok",
-  cancelado: "bg-danger/15 text-danger",
-  atendido: "bg-surface-2 text-muted",
-  ausente: "bg-danger/15 text-danger",
-};
 // Estilo de la tarjeta en la grilla, por estado (borde izquierdo de color).
 const CARD_ACCENT: Record<TurnoEstado, string> = {
   pendiente: "border-l-warn bg-warn/5",
@@ -72,19 +54,11 @@ const DEFAULT_START_H = 8;
 const DEFAULT_END_H = 20;
 const MOSTRAR_CANCELADOS_KEY = "foko:agenda-mostrar-cancelados";
 
-// --- Helpers de fecha (AR, estables vía mediodía UTC) ---
-function diaSemanaDe(iso: string): number {
-  return new Date(`${iso}T12:00:00Z`).getUTCDay();
-}
-function sumarDias(iso: string, n: number): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
+// --- Helpers de fecha ---
 function lunesDe(iso: string): string {
-  const dow = diaSemanaDe(iso);
+  const dow = diaSemanaISO(iso);
   const offset = dow === 0 ? -6 : 1 - dow;
-  return sumarDias(iso, offset);
+  return sumarDiasISO(iso, offset);
 }
 function tituloDia(iso: string, corto = false): string {
   const d = new Date(`${iso}T12:00:00Z`);
@@ -117,7 +91,6 @@ function minutosAHHMM(min: number): string {
   const mm = min % 60;
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
-
 // "HH:MM:SS" | "HH:MM" -> minutos.
 function horaAMin(t: string): number {
   const [hh, mm] = t.split(":").map(Number);
@@ -125,18 +98,17 @@ function horaAMin(t: string): number {
 }
 
 export default function AgendaAdmin({
-  profesionales,
+  profesionalId,
   horarios,
   bloqueos,
 }: {
-  profesionales: ProfesionalConNombre[];
+  profesionalId: string;
   horarios: ProfesionalHorario[];
   bloqueos: ProfesionalBloqueo[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [vista, setVista] = useState<Vista>("dia");
   const [ancla, setAncla] = useState<string>(hoyISOArgentina());
-  const [profesionalId, setProfesionalId] = useState<string>("");
   const [turnos, setTurnos] = useState<TurnoConDetalle[]>([]);
   const [cargando, setCargando] = useState(true);
   const [mostrarCancelados, setMostrarCancelados] = useState(false);
@@ -148,12 +120,14 @@ export default function AgendaAdmin({
   const [toast, setToast] = useState<ToastState | null>(null);
   // Evita que el "click" que dispara dnd-kit al soltar abra el detalle.
   const arrastroReciente = useRef(false);
+  // Contenedor scrolleable de la grilla (para el auto-scroll a la hora actual).
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const desde = vista === "dia" ? ancla : lunesDe(ancla);
   const dias = vista === "dia" ? 1 : 7;
-  const hasta = sumarDias(desde, dias);
+  const hasta = sumarDiasISO(desde, dias);
   const columnas = useMemo(
-    () => Array.from({ length: dias }, (_, i) => sumarDias(desde, i)),
+    () => Array.from({ length: dias }, (_, i) => sumarDiasISO(desde, i)),
     [desde, dias],
   );
 
@@ -198,25 +172,32 @@ export default function AgendaAdmin({
     cargar();
   }, [cargar]);
 
-  // --- Rango horario visible: cubre horarios cargados + turnos, con fallback. ---
+  // --- Rango horario visible: primera hora con disponibilidad del día -> última. ---
   const [startMin, endMin] = useMemo(() => {
-    let ini = DEFAULT_START_H * 60;
-    let fin = DEFAULT_END_H * 60;
+    // Solo las franjas de los días visibles (y del profesional filtrado): la
+    // grilla arranca en la primera hora con disponibilidad y termina en la
+    // última, sin filas muertas de madrugada.
+    const diasVisibles = new Set(columnas.map(diaSemanaISO));
+    const inicios: number[] = [];
+    const fines: number[] = [];
     for (const h of horarios) {
-      ini = Math.min(ini, horaAMin(h.hora_inicio));
-      fin = Math.max(fin, horaAMin(h.hora_fin));
+      if (profesionalId && h.profesional_id !== profesionalId) continue;
+      if (!diasVisibles.has(h.dia_semana)) continue;
+      inicios.push(horaAMin(h.hora_inicio));
+      fines.push(horaAMin(h.hora_fin));
     }
+    // Los turnos existentes siempre entran, aunque caigan fuera de la franja.
     for (const t of turnos) {
       const m = minutosDelDiaAR(t.fecha_hora);
-      ini = Math.min(ini, m);
-      fin = Math.max(fin, m + (t.duracion_min || SLOT_MIN));
+      inicios.push(m);
+      fines.push(m + (t.duracion_min || SLOT_MIN));
     }
-    // Redondeo a la hora y clamp.
-    ini = Math.max(0, Math.floor(ini / 60) * 60);
-    fin = Math.min(24 * 60, Math.ceil(fin / 60) * 60);
+    if (inicios.length === 0) return [DEFAULT_START_H * 60, DEFAULT_END_H * 60];
+    const ini = Math.max(0, Math.floor(Math.min(...inicios) / 60) * 60);
+    let fin = Math.min(24 * 60, Math.ceil(Math.max(...fines) / 60) * 60);
     if (fin <= ini) fin = ini + 60;
     return [ini, fin];
-  }, [horarios, turnos]);
+  }, [horarios, turnos, columnas, profesionalId]);
 
   const slots = useMemo(() => {
     const out: number[] = [];
@@ -236,6 +217,25 @@ export default function AgendaAdmin({
     }
     return map;
   }, [turnos, mostrarCancelados]);
+
+  // Auto-scroll a la hora actual (o al primer turno si es más temprano) cuando
+  // la vista incluye el día de hoy.
+  useEffect(() => {
+    if (cargando) return;
+    const hoy = hoyISOArgentina();
+    if (!columnas.includes(hoy)) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const nowMin = minutosDelDiaAR(new Date().toISOString());
+    const turnosHoy = porDia.get(hoy) ?? [];
+    const earliest = turnosHoy.length
+      ? Math.min(...turnosHoy.map((t) => minutosDelDiaAR(t.fecha_hora)))
+      : Infinity;
+    let target = Math.min(nowMin, earliest);
+    target = Math.max(startMin, Math.min(target, endMin));
+    el.scrollTop = Math.max(0, ((target - startMin) / SLOT_MIN) * SLOT_PX - 12);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargando, ancla, vista, startMin]);
 
   const activeTurno = activeId
     ? turnos.find((t) => t.id === activeId) ?? null
@@ -265,7 +265,9 @@ export default function AgendaAdmin({
 
     const over = e.over;
     if (!over) return;
-    const data = over.data.current as { dayISO: string; minutes: number } | undefined;
+    const data = over.data.current as
+      | { dayISO: string; minutes: number }
+      | undefined;
     if (!data) return;
 
     const turno = turnos.find((t) => t.id === String(e.active.id));
@@ -273,7 +275,6 @@ export default function AgendaAdmin({
 
     const nuevaFecha = data.dayISO;
     const nuevaHora = minutosAHHMM(data.minutes);
-    // Sin cambios (mismo día y misma hora) -> no abrimos el modal.
     const mismoDia = arDateKey(turno.fecha_hora) === nuevaFecha;
     const mismaHora = minutosDelDiaAR(turno.fecha_hora) === data.minutes;
     if (mismoDia && mismaHora) return;
@@ -299,7 +300,6 @@ export default function AgendaAdmin({
     const finMin = minutes + dur;
     const nombreProf = turno.profesional?.name ?? "el profesional";
 
-    // ¿Cae sobre un bloqueo?
     const startUtc = arLocalToUtc(dayISO, minutosAHHMM(minutes));
     const endUtc = new Date(
       new Date(startUtc).getTime() + dur * 60_000,
@@ -308,19 +308,16 @@ export default function AgendaAdmin({
       (b) =>
         b.profesional_id === profId && startUtc < b.hasta && endUtc > b.desde,
     );
-    if (enBloqueo)
-      return `⚠ Cae sobre un bloqueo de ${nombreProf}`;
+    if (enBloqueo) return `⚠ Cae sobre un bloqueo de ${nombreProf}`;
 
-    // ¿Dentro de alguna franja de atención de ese día?
-    const dow = diaSemanaDe(dayISO);
+    const dow = diaSemanaISO(dayISO);
     const franjas = horarios.filter(
       (h) => h.profesional_id === profId && h.dia_semana === dow,
     );
     const dentro = franjas.some(
       (f) => minutes >= horaAMin(f.hora_inicio) && finMin <= horaAMin(f.hora_fin),
     );
-    if (!dentro)
-      return `⚠ Fuera del horario habitual de ${nombreProf}`;
+    if (!dentro) return `⚠ Fuera del horario habitual de ${nombreProf}`;
 
     return null;
   }
@@ -328,11 +325,10 @@ export default function AgendaAdmin({
   // --- Guardado optimista con rollback ---
   async function confirmarMovimiento() {
     if (!pendiente) return;
-    const { turno, nuevoUtc, nuevaFecha, nuevaHora } = pendiente;
+    const { turno, nuevoUtc } = pendiente;
     setPendiente(null);
 
     const prev = turnos;
-    // Optimista: la tarjeta ya salta al destino.
     setTurnos((ts) =>
       ts.map((t) => (t.id === turno.id ? { ...t, fecha_hora: nuevoUtc } : t)),
     );
@@ -362,61 +358,28 @@ export default function AgendaAdmin({
     }
 
     // Éxito: ofrecer avisar por WhatsApp.
-    const tel = normalizeArPhone(turno.paciente?.telefono);
+    const waUrl = waReprogramadoUrl(turno, nuevoUtc);
     setToast({
       tipo: "ok",
       mensaje: "Turno reprogramado.",
-      accion:
-        tel && turno.paciente
-          ? {
-              label: "Avisar por WhatsApp",
-              onClick: () =>
-                abrirWhatsApp(turno, nuevaFecha, nuevaHora, nuevoUtc),
-            }
-          : undefined,
+      accion: waUrl
+        ? {
+            label: "Avisar por WhatsApp",
+            onClick: () => window.open(waUrl, "_blank", "noopener,noreferrer"),
+          }
+        : undefined,
     });
-  }
-
-  function abrirWhatsApp(
-    turno: TurnoConDetalle,
-    _fecha: string,
-    _hora: string,
-    nuevoUtc: string,
-  ) {
-    const tel = normalizeArPhone(turno.paciente?.telefono);
-    if (!tel) return;
-    const nombre = turno.paciente?.nombre ?? "";
-    const servicio = turno.servicio?.nombre ?? "tu turno";
-    const fechaTxt = formatArFecha(nuevoUtc, {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-    });
-    const horaTxt = formatArHora(nuevoUtc);
-    const msg =
-      `Hola ${nombre}! Tu turno de ${servicio} se reprogramó para el ` +
-      `${fechaTxt} a las ${horaTxt}. Cualquier cosa avisanos por acá.`;
-    window.open(
-      `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
   }
 
   // --- Cambio de estado (se mantiene el flujo de confirmar por WhatsApp) ---
   async function cambiarEstado(id: string, estado: TurnoEstado) {
     if (estado === "confirmado") {
-      const res = await fetch("/api/turnos/confirmar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ turnoId: id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setToast({ tipo: "error", mensaje: data.error || "No se pudo confirmar." });
+      const r = await confirmarTurnoApi(id);
+      if (!r.ok) {
+        setToast({ tipo: "error", mensaje: r.error ?? "No se pudo confirmar." });
         return;
       }
-      if (data.warning) setToast({ tipo: "error", mensaje: data.warning });
+      if (r.warning) setToast({ tipo: "error", mensaje: r.warning });
       setDetalle(null);
       cargar();
       return;
@@ -457,7 +420,7 @@ export default function AgendaAdmin({
 
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setAncla(sumarDias(ancla, -dias))}
+            onClick={() => setAncla(sumarDiasISO(ancla, -dias))}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-muted hover:text-ink"
             aria-label="Anterior"
           >
@@ -470,7 +433,7 @@ export default function AgendaAdmin({
             Hoy
           </button>
           <button
-            onClick={() => setAncla(sumarDias(ancla, dias))}
+            onClick={() => setAncla(sumarDiasISO(ancla, dias))}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-muted hover:text-ink"
             aria-label="Siguiente"
           >
@@ -478,34 +441,17 @@ export default function AgendaAdmin({
           </button>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={toggleCancelados}
-            title="Mostrar u ocultar los turnos cancelados"
-            className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              mostrarCancelados
-                ? "border-danger/30 bg-danger/10 text-danger"
-                : "border-line bg-surface text-muted hover:text-ink"
-            }`}
-          >
-            {mostrarCancelados ? "Ocultar cancelados" : "Mostrar cancelados"}
-          </button>
-
-          {profesionales.length > 1 && (
-            <select
-              value={profesionalId}
-              onChange={(e) => setProfesionalId(e.target.value)}
-              className="rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-semibold text-ink outline-none"
-            >
-              <option value="">Todos los profesionales</option>
-              {profesionales.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+        <button
+          onClick={toggleCancelados}
+          title="Mostrar u ocultar los turnos cancelados"
+          className={`ml-auto rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+            mostrarCancelados
+              ? "border-danger/30 bg-danger/10 text-danger"
+              : "border-line bg-surface text-muted hover:text-ink"
+          }`}
+        >
+          {mostrarCancelados ? "Ocultar cancelados" : "Mostrar cancelados"}
+        </button>
       </div>
 
       {cargando && (
@@ -523,67 +469,76 @@ export default function AgendaAdmin({
           onDragEnd={onDragEnd}
           onDragCancel={() => setActiveId(null)}
         >
-          <div className="overflow-x-auto rounded-panel border border-line bg-surface shadow-card">
-            <div
-              className="grid"
-              style={{
-                gridTemplateColumns: `3rem repeat(${columnas.length}, minmax(96px, 1fr))`,
-                minWidth: vista === "semana" ? 3 * 16 + columnas.length * 96 : undefined,
-              }}
-            >
-              {/* Cabecera de días */}
-              <div className="sticky left-0 z-10 border-b border-line bg-surface" />
-              {columnas.map((dia) => (
-                <div
-                  key={dia}
-                  className={`border-b border-l border-line px-2 py-2 text-center text-[12px] font-bold capitalize ${
-                    dia === hoyISOArgentina() ? "text-accent" : "text-muted"
-                  }`}
-                >
-                  {tituloDia(dia, vista === "semana")}
-                </div>
-              ))}
-
-              {/* Cuerpo: gutter de horas + columnas */}
-              <div className="relative" style={{ height: totalPx }}>
-                {slots.map((m) => (
+          <div className="rounded-panel border border-line bg-surface shadow-card">
+            <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
+              <div
+                className="grid"
+                style={{
+                  gridTemplateColumns: `3rem repeat(${columnas.length}, minmax(96px, 1fr))`,
+                  minWidth:
+                    vista === "semana"
+                      ? 3 * 16 + columnas.length * 96
+                      : undefined,
+                }}
+              >
+                {/* Cabecera de días (sticky arriba) */}
+                <div className="sticky left-0 top-0 z-20 border-b border-line bg-surface" />
+                {columnas.map((dia) => (
                   <div
-                    key={m}
-                    className="absolute right-1 -translate-y-1/2 text-[10px] font-semibold text-faint"
-                    style={{ top: ((m - startMin) / SLOT_MIN) * SLOT_PX }}
+                    key={dia}
+                    className={`sticky top-0 z-20 border-b border-l border-line bg-surface px-2 py-2 text-center text-[12px] font-bold capitalize ${
+                      dia === hoyISOArgentina() ? "text-accent" : "text-muted"
+                    }`}
                   >
-                    {m % 60 === 0 ? minutosAHHMM(m) : ""}
+                    {tituloDia(dia, vista === "semana")}
                   </div>
                 ))}
-              </div>
 
-              {columnas.map((dia) => (
-                <ColumnaDia
-                  key={dia}
-                  dia={dia}
-                  slots={slots}
-                  startMin={startMin}
-                  turnos={porDia.get(dia) ?? []}
-                  profesionalId={profesionalId}
-                  activeId={activeId}
-                  onCardClick={(t) => {
-                    if (arrastroReciente.current) return;
-                    setDetalle(t);
-                  }}
-                />
-              ))}
+                {/* Gutter de horas */}
+                <div className="relative" style={{ height: totalPx }}>
+                  {slots.map((m) => (
+                    <div
+                      key={m}
+                      className="absolute right-1 -translate-y-1/2 text-[10px] font-semibold text-faint"
+                      style={{ top: ((m - startMin) / SLOT_MIN) * SLOT_PX }}
+                    >
+                      {m % 60 === 0 ? minutosAHHMM(m) : ""}
+                    </div>
+                  ))}
+                </div>
+
+                {columnas.map((dia) => (
+                  <ColumnaDia
+                    key={dia}
+                    dia={dia}
+                    slots={slots}
+                    startMin={startMin}
+                    turnos={porDia.get(dia) ?? []}
+                    profesionalId={profesionalId}
+                    activeId={activeId}
+                    onCardClick={(t) => {
+                      if (arrastroReciente.current) return;
+                      setDetalle(t);
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Tarjeta elevada mientras se arrastra */}
-          <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2,0,0,1)" }}>
+          <DragOverlay
+            dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2,0,0,1)" }}
+          >
             {activeTurno ? (
               <TarjetaContenido
                 turno={activeTurno}
                 profesionalId={profesionalId}
                 heightPx={
-                  Math.max(1, (activeTurno.duracion_min || SLOT_MIN) / SLOT_MIN) *
-                  SLOT_PX
+                  Math.max(
+                    1,
+                    (activeTurno.duracion_min || SLOT_MIN) / SLOT_MIN,
+                  ) * SLOT_PX
                 }
                 elevada
               />
@@ -646,18 +601,22 @@ function ColumnaDia({
 }) {
   const totalPx = slots.length * SLOT_PX;
   return (
-    <div
-      className="relative border-l border-line"
-      style={{ height: totalPx }}
-    >
+    <div className="relative border-l border-line" style={{ height: totalPx }}>
       {/* Slots droppables + líneas de grilla */}
       {slots.map((m) => (
-        <SlotCell key={m} dayISO={dia} minutes={m} startMin={startMin} activeId={activeId} />
+        <SlotCell
+          key={m}
+          dayISO={dia}
+          minutes={m}
+          startMin={startMin}
+          activeId={activeId}
+        />
       ))}
 
       {/* Tarjetas */}
       {turnos.map((t) => {
-        const top = ((minutosDelDiaAR(t.fecha_hora) - startMin) / SLOT_MIN) * SLOT_PX;
+        const top =
+          ((minutosDelDiaAR(t.fecha_hora) - startMin) / SLOT_MIN) * SLOT_PX;
         const height =
           Math.max(1, (t.duracion_min || SLOT_MIN) / SLOT_MIN) * SLOT_PX;
         return (
@@ -734,9 +693,17 @@ function TurnoCard({
       // Sin `touch-action: none`: el TouchSensor usa el delay de long-press, así
       // el scroll normal gana si el dedo se mueve antes de levantar la tarjeta.
       className="absolute inset-x-1 z-[1] cursor-pointer"
-      style={{ top: top + 1, height: Math.max(SLOT_PX - 2, height - 2), opacity: oculta || isDragging ? 0.35 : 1 }}
+      style={{
+        top: top + 1,
+        height: Math.max(SLOT_PX - 2, height - 2),
+        opacity: oculta || isDragging ? 0.35 : 1,
+      }}
     >
-      <TarjetaContenido turno={turno} profesionalId={profesionalId} heightPx={Math.max(SLOT_PX - 2, height - 2)} />
+      <TarjetaContenido
+        turno={turno}
+        profesionalId={profesionalId}
+        heightPx={Math.max(SLOT_PX - 2, height - 2)}
+      />
     </div>
   );
 }
@@ -962,49 +929,6 @@ function Overlay({
   );
 }
 
-// ============================================================
-// Toast con acción opcional
-// ============================================================
-function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
-  useEffect(() => {
-    const ms = toast.accion ? 9000 : 4500;
-    const id = setTimeout(onClose, ms);
-    return () => clearTimeout(id);
-  }, [toast, onClose]);
-
-  return (
-    <div className="fixed inset-x-0 bottom-4 z-[60] flex justify-center px-4">
-      <div
-        className={`flex items-center gap-3 rounded-full border px-4 py-2.5 text-[13px] font-semibold shadow-card ${
-          toast.tipo === "error"
-            ? "border-danger/30 bg-danger/10 text-danger"
-            : "border-line bg-surface text-ink"
-        }`}
-      >
-        <span>{toast.mensaje}</span>
-        {toast.accion && (
-          <button
-            onClick={() => {
-              toast.accion!.onClick();
-              onClose();
-            }}
-            className="rounded-full bg-ok px-3 py-1 text-[12px] font-bold text-white hover:bg-ok/90"
-          >
-            {toast.accion.label}
-          </button>
-        )}
-        <button
-          onClick={onClose}
-          className="text-muted hover:text-ink"
-          aria-label="Cerrar"
-        >
-          ✕
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // --- Tipos locales ---
 interface MovimientoPendiente {
   turno: TurnoConDetalle;
@@ -1012,9 +936,4 @@ interface MovimientoPendiente {
   nuevaHora: string;
   nuevoUtc: string;
   aviso: string | null;
-}
-interface ToastState {
-  tipo: "ok" | "error";
-  mensaje: string;
-  accion?: { label: string; onClick: () => void };
 }

@@ -73,6 +73,21 @@ export function arDateKey(iso: string | Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: AR_TZ });
 }
 
+// --- Aritmética de días sobre claves "YYYY-MM-DD" ------------
+// Estables vía mediodía UTC (no se corren por DST ni por la zona del runtime).
+
+/** Suma `n` días a una clave "YYYY-MM-DD" y devuelve otra clave. */
+export function sumarDiasISO(iso: string, n: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Día de la semana (0=domingo .. 6=sábado) de una clave "YYYY-MM-DD". */
+export function diaSemanaISO(iso: string): number {
+  return new Date(`${iso}T12:00:00Z`).getUTCDay();
+}
+
 // --- Formateo (siempre con timeZone pinneada) ---------------
 
 export function formatArHora(iso: string | Date): string {

@@ -9,9 +9,8 @@ import {
   getHorarios,
   getBloqueosFuturos,
 } from "@/lib/reservas";
-import AgendaAdmin from "@/components/turnos/AgendaAdmin";
 import TurnosPendientesIA from "@/components/turnos/TurnosPendientesIA";
-import NuevoTurnoPanel from "@/components/turnos/NuevoTurnoPanel";
+import TurnosVista from "@/components/turnos/TurnosVista";
 
 export default async function TurnosPage({
   searchParams,
@@ -73,8 +72,8 @@ export default async function TurnosPage({
             </h1>
             <p className="text-sm text-muted">
               {esProfesional && servicioNombre
-                ? `${servicioNombre} · día y semana.`
-                : "Agenda del día y de la semana."}
+                ? `${servicioNombre} · lista y agenda.`
+                : "Tu lista de trabajo y la agenda para reprogramar."}
             </p>
           </div>
           <Link
@@ -87,16 +86,14 @@ export default async function TurnosPage({
 
         {!esProfesional && <TurnosPendientesIA turnos={pendientesIA} />}
 
-        <NuevoTurnoPanel
+        <TurnosVista
           tenantId={agent.tenant_id}
+          esOwner={!esProfesional}
           pacientes={pacientes.map((p) => ({ id: p.id, nombre: p.nombre }))}
           agentes={agentes ?? []}
+          profesionales={profesionales}
           defaultProfesionalId={agent.id}
           defaultPacienteId={pacientePreseleccionado}
-        />
-
-        <AgendaAdmin
-          profesionales={profesionales}
           horarios={horarios}
           bloqueos={bloqueos}
         />
