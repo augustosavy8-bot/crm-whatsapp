@@ -1,8 +1,8 @@
 {
   "id": "/dashboard",
-  "name": "WhatsApp CRM",
-  "short_name": "WA CRM",
-  "description": "Inbox interno de WhatsApp, Instagram y Messenger",
+  "name": "KINACTIVA",
+  "short_name": "KINACTIVA",
+  "description": "Panel de gestión de KINACTIVA",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

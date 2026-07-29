@@ -54,10 +54,10 @@ export default async function AppLayout({
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-4 py-2.5">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
-            F
+            K
           </div>
           <span className="hidden text-sm font-bold tracking-tight sm:block">
-            WhatsApp CRM
+            KINACTIVA
           </span>
         </div>
         <HeaderNav

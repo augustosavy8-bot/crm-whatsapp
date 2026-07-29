@@ -58,11 +58,11 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-base font-bold text-white">
-            F
+            K
           </div>
           <div>
             <h1 className="text-lg font-bold leading-tight tracking-tight">
-              WhatsApp CRM
+              KINACTIVA
             </h1>
             <p className="text-xs text-muted">Panel interno</p>
           </div>

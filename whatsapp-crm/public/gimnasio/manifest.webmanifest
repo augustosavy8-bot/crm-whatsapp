@@ -1,8 +1,8 @@
 {
   "id": "/gimnasio",
-  "name": "Mi Gimnasio",
-  "short_name": "Gimnasio",
-  "description": "Reservá tus turnos de kinesiología, nutrición y entrenamiento.",
+  "name": "KINACTIVA",
+  "short_name": "KINACTIVA",
+  "description": "Reservá tus turnos de kinesiología, nutrición y entrenamiento en KINACTIVA.",
   "start_url": "/gimnasio",
   "scope": "/gimnasio",
   "display": "standalone",

@@ -6,16 +6,16 @@ import type { Metadata } from "next";
 // Override del manifest: el root layout advertía el manifest del CRM en toda
 // ruta. Next mergea el metadata de root hacia abajo y REEMPLAZA las claves
 // duplicadas, así que esto hace que /gimnasio se ofrezca a instalar como la
-// app del gimnasio y no como "WhatsApp CRM". El SW y el manifest son propios,
+// app del gimnasio (KINACTIVA) y no como el panel interno. El SW y el manifest son propios,
 // con scope /gimnasio/, sin tocar la PWA del CRM.
 export const metadata: Metadata = {
-  title: "Gimnasio · Sacá tu turno",
+  title: "KINACTIVA · Reservá tu turno",
   description:
-    "Reservá tu turno de kinesiología, nutrición o entrenamiento online, sin llamar.",
+    "Reservá tu turno de kinesiología, nutrición o entrenamiento en KINACTIVA, sin llamar.",
   manifest: "/gimnasio/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Mi Gimnasio",
+    title: "KINACTIVA",
     statusBarStyle: "default",
   },
 };

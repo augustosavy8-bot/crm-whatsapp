@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 import { contactLabel, messagePreview } from "@/lib/format";
 import type { Message } from "@/lib/types";
 
-const BASE_TITLE = "WhatsApp CRM";
+const BASE_TITLE = "KINACTIVA";
 const MUTE_KEY = "foko_notif_muted";
 
 type Permission = NotificationPermission | "unsupported";

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WhatsApp CRM",
-  description: "Inbox interno de WhatsApp Business",
+  title: "KINACTIVA",
+  description: "Reservá tu turno en KINACTIVA",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icon-192.png",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "WhatsApp CRM",
+    title: "KINACTIVA",
     statusBarStyle: "default",
   },
 };

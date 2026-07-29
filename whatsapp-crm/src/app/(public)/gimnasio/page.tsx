@@ -24,7 +24,7 @@ export default async function GimnasioLanding() {
         <div className="relative mx-auto max-w-3xl px-5 pb-14 pt-8 sm:pt-12">
           <div className="mb-10 flex items-center justify-between">
             <span className="text-[15px] font-bold tracking-tight">
-              {gym?.nombre ?? "Mi Gimnasio"}
+              {gym?.nombre ?? "KINACTIVA"}
             </span>
             <InstalarApp />
           </div>

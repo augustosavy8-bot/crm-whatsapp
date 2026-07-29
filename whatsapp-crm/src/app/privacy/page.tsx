@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidad · WhatsApp CRM",
+  title: "Política de Privacidad · KINACTIVA",
   description:
     "Política de privacidad de la herramienta interna de gestión de mensajes (CRM).",
 };
@@ -18,7 +18,7 @@ export default function PrivacyPage() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
               F
             </div>
-            <span className="text-sm font-semibold">WhatsApp CRM</span>
+            <span className="text-sm font-semibold">KINACTIVA</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Política de Privacidad
@@ -140,7 +140,7 @@ export default function PrivacyPage() {
         </div>
 
         <footer className="mt-10 border-t border-neutral-200 dark:border-neutral-800 pt-6 text-xs text-neutral-400">
-          © 2026 WhatsApp CRM · Herramienta interna.
+          © 2026 KINACTIVA · Herramienta interna.
         </footer>
       </article>
     </main>
