@@ -634,6 +634,8 @@ function Socios({ tenantId }: { tenantId: string }) {
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [guardando, setGuardando] = useState(false);
+  // Links de adhesión MP generados en esta sesión, por socio.
+  const [mpLinks, setMpLinks] = useState<Record<string, string>>({});
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -699,6 +701,32 @@ function Socios({ tenantId }: { tenantId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo actualizar.");
     }
+  }
+
+  // Genera el link de adhesión al débito automático de MercadoPago para el
+  // socio. Requiere email (si no lo tiene, lo pedimos). Si MP no está
+  // configurado todavía, la ruta devuelve 503 con un mensaje claro.
+  async function adherirMp(s: GymSocio) {
+    setError(null);
+    let email = s.email ?? "";
+    if (!email) {
+      email = window.prompt(`Email de ${s.nombre} para MercadoPago:`)?.trim() ?? "";
+      if (!email) return;
+    }
+    const res = await fetch("/api/gym/mp/adherir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alumnoId: s.id, email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "No se pudo generar la adhesión.");
+      return;
+    }
+    if (data.initPoint) {
+      setMpLinks((m) => ({ ...m, [s.id]: data.initPoint }));
+    }
+    cargar();
   }
 
   const filtrados = socios.filter(
@@ -813,6 +841,39 @@ function Socios({ tenantId }: { tenantId: string }) {
                     ))}
                   </div>
                 </div>
+                {s.metodo_pago === "mercadopago" && (
+                  <div className="mt-2 border-t border-line pt-2">
+                    {s.mp_estado === "authorized" ? (
+                      <span className="text-[12px] font-semibold text-ok">
+                        ✓ Débito automático activo
+                      </span>
+                    ) : (
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => adherirMp(s)}
+                          className="text-[12px] font-semibold text-accent hover:brightness-90"
+                        >
+                          Generar link de adhesión (débito automático)
+                        </button>
+                        {mpLinks[s.id] && (
+                          <a
+                            href={mpLinks[s.id]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block truncate rounded-lg bg-surface-2 px-2 py-1.5 text-[11px] text-accent underline"
+                          >
+                            {mpLinks[s.id]}
+                          </a>
+                        )}
+                        {s.mp_estado && s.mp_estado !== "authorized" && (
+                          <p className="text-[11px] text-muted">
+                            Estado MP: {s.mp_estado}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

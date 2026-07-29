@@ -40,6 +40,8 @@ export interface GymSocio {
   es_socio: boolean;
   cuota_hasta: string | null;
   metodo_pago: "efectivo" | "mercadopago";
+  mp_preapproval_id: string | null;
+  mp_estado: string | null;
   created_at: string;
 }
 
@@ -121,7 +123,9 @@ export async function setGymHorarioActivo(
 export async function getGymAlumnos(sb: SupabaseClient): Promise<GymSocio[]> {
   const { data, error } = await sb
     .from("gym_alumnos")
-    .select("id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, created_at")
+    .select(
+      "id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, mp_preapproval_id, mp_estado, created_at",
+    )
     .order("nombre", { ascending: true });
   if (error) throw error;
   return (data ?? []) as GymSocio[];
