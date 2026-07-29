@@ -26,17 +26,25 @@ const ITEMS_PROFESIONAL = [
 export default function HeaderNav({
   role,
   inboxEnabled = true,
+  gymAdmin = false,
 }: {
   role?: string;
   inboxEnabled?: boolean;
+  gymAdmin?: boolean;
 }) {
   const path = usePathname();
-  const ITEMS =
+  const base =
     role === "profesional"
       ? ITEMS_PROFESIONAL
       : inboxEnabled
         ? ITEMS_OWNER
         : ITEMS_OWNER_SIN_INBOX;
+  // El panel de gimnasio (cupo grupal) lo ven el owner y quien tenga gym_admin
+  // (Mariano). Se suma al final de la nav que le corresponda por rol.
+  const ITEMS =
+    gymAdmin || role === "owner"
+      ? [...base, { href: "/gym", label: "Gimnasio" }]
+      : base;
   return (
     <nav className="flex items-center gap-1 rounded-full bg-surface-2 p-1">
       {ITEMS.map((it) => {

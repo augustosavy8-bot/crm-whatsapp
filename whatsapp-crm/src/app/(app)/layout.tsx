@@ -22,10 +22,11 @@ export default async function AppLayout({
 
   const { data: agente } = await supabase
     .from("agents")
-    .select("role")
+    .select("role, gym_admin")
     .eq("auth_user_id", user.id)
     .maybeSingle();
   const esProfesional = agente?.role === "profesional";
+  const esGymAdmin = agente?.gym_admin === true;
 
   // Módulos del tenant: una sola lectura por request, se baja por props.
   // El profesional tiene nav fijo (solo su agenda), no depende de esto.
@@ -59,7 +60,11 @@ export default async function AppLayout({
             WhatsApp CRM
           </span>
         </div>
-        <HeaderNav role={agente?.role} inboxEnabled={modulos.inbox} />
+        <HeaderNav
+          role={agente?.role}
+          inboxEnabled={modulos.inbox}
+          gymAdmin={esGymAdmin}
+        />
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="hidden text-xs text-muted lg:block">
             {user.email}

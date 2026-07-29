@@ -38,12 +38,20 @@ export default async function GimnasioLanding() {
             servicio, el día y el horario. Listo.
           </p>
 
-          <Link
-            href="/gimnasio/reservar"
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3.5 text-[15px] font-bold text-white shadow-pop transition-transform hover:scale-[1.02] active:scale-100"
-          >
-            Sacar turno →
-          </Link>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/gimnasio/reservar"
+              className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3.5 text-[15px] font-bold text-white shadow-pop transition-transform hover:scale-[1.02] active:scale-100"
+            >
+              Sacar turno →
+            </Link>
+            <Link
+              href="/gimnasio/clases"
+              className="inline-flex items-center gap-2 rounded-full border border-white/25 px-6 py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-white/10"
+            >
+              Reservar clase de gym →
+            </Link>
+          </div>
         </div>
       </section>
 
