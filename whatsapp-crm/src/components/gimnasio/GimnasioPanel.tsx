@@ -4,13 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   crearGymHorario,
+  getGymAlumnos,
   getGymHorarios,
   getGymOcupacion,
   setGymHorarioActivo,
+  updateGymSocio,
   type GymHorario,
   type GymOcupacionHorario,
+  type GymSocio,
 } from "@/lib/gymCupoAdmin";
 import { hoyISOArgentina, sumarDiasISO } from "@/lib/tz";
+import { normalizeArPhone } from "@/lib/phone";
 
 // ============================================================
 // Panel admin del gimnasio (owner / gym_admin). Dos tabs:
@@ -35,29 +39,45 @@ function fechaTitulo(iso: string): string {
   }).format(new Date(`${iso}T12:00:00Z`));
 }
 
+const TABS = [
+  { key: "agenda", label: "Agenda" },
+  { key: "socios", label: "Socios" },
+  { key: "horarios", label: "Horarios" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+
 export default function GimnasioPanel({ tenantId }: { tenantId: string }) {
-  const [tab, setTab] = useState<"agenda" | "horarios">("agenda");
+  const [tab, setTab] = useState<Tab>("agenda");
 
   return (
     <div className="space-y-4">
       <div className="flex rounded-full bg-surface-2 p-1">
-        {(["agenda", "horarios"] as const).map((t) => (
+        {TABS.map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={t.key}
+            onClick={() => setTab(t.key)}
             className={[
               "flex-1 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-              tab === t ? "bg-ink text-white" : "text-muted hover:text-ink",
+              tab === t.key ? "bg-ink text-white" : "text-muted hover:text-ink",
             ].join(" ")}
           >
-            {t === "agenda" ? "Agenda" : "Horarios"}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {tab === "agenda" ? <Agenda /> : <Horarios tenantId={tenantId} />}
+      {tab === "agenda" && <Agenda />}
+      {tab === "socios" && <Socios tenantId={tenantId} />}
+      {tab === "horarios" && <Horarios tenantId={tenantId} />}
     </div>
   );
+}
+
+// Estado de cuota de un alumno para la fecha de hoy.
+function cuotaVencida(esSocio: boolean, cuotaHasta: string | null): boolean {
+  if (!esSocio) return true;
+  if (!cuotaHasta) return true;
+  return cuotaHasta < hoyISOArgentina();
 }
 
 // ------------------------------------------------------------
@@ -110,6 +130,28 @@ function Agenda() {
       );
     if (error) setError(error.message);
     else cargar();
+  }
+
+  // Confirmar/rechazar una reserva pendiente. Va por la ruta (dispara el
+  // WhatsApp al confirmar); devuelve un warning si no se pudo avisar.
+  async function decidir(
+    tipo: "suelta" | "fijo",
+    id: string,
+    accion: "confirmar" | "rechazar",
+  ) {
+    if (accion === "rechazar" && !confirm("¿Rechazar esta reserva?")) return;
+    const res = await fetch("/api/gym/admin/decidir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo, id, accion }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "No se pudo procesar.");
+      return;
+    }
+    if (data.warning) setError(data.warning);
+    cargar();
   }
 
   return (
@@ -175,43 +217,86 @@ function Agenda() {
 
               {h.alumnos.length > 0 ? (
                 <ul className="mt-3 divide-y divide-line">
-                  {h.alumnos.map((a) => (
-                    <li
-                      key={`${a.tipo}-${a.alumno_id}-${a.turno_fijo_id ?? a.reserva_id}`}
-                      className="flex items-center justify-between gap-2 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[14px] font-medium text-ink">
-                          {a.nombre}
-                        </span>
-                        <span
-                          className={[
-                            "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                            a.tipo === "fijo"
-                              ? "bg-accent-soft text-accent"
-                              : "bg-surface-2 text-muted",
-                          ].join(" ")}
-                        >
-                          {a.tipo === "fijo" ? "Fijo" : "Suelto"}
-                        </span>
-                      </div>
-                      {a.tipo === "fijo" && a.turno_fijo_id ? (
-                        <button
-                          onClick={() => noVieneHoy(a.turno_fijo_id!)}
-                          className="shrink-0 text-[12px] font-semibold text-muted hover:text-danger"
-                        >
-                          No viene hoy
-                        </button>
-                      ) : a.reserva_id ? (
-                        <button
-                          onClick={() => quitarSuelta(a.reserva_id!)}
-                          className="shrink-0 text-[12px] font-semibold text-muted hover:text-danger"
-                        >
-                          Quitar
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
+                  {h.alumnos.map((a) => {
+                    const pendiente = a.estado === "pendiente";
+                    const vencida = cuotaVencida(a.es_socio, a.cuota_hasta);
+                    return (
+                      <li
+                        key={`${a.tipo}-${a.alumno_id}-${a.turno_fijo_id ?? a.reserva_id}`}
+                        className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                      >
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[14px] font-medium text-ink">
+                            {a.nombre}
+                          </span>
+                          <span
+                            className={[
+                              "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                              a.tipo === "fijo"
+                                ? "bg-accent-soft text-accent"
+                                : "bg-surface-2 text-muted",
+                            ].join(" ")}
+                          >
+                            {a.tipo === "fijo" ? "Fijo" : "Suelto"}
+                          </span>
+                          {pendiente && (
+                            <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[10px] font-bold uppercase text-warn">
+                              Pendiente
+                            </span>
+                          )}
+                          {vencida && (
+                            <span className="rounded-full bg-danger/15 px-2 py-0.5 text-[10px] font-bold uppercase text-danger">
+                              {a.es_socio ? "Cuota vencida" : "No socio"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {pendiente ? (
+                            <>
+                              <button
+                                onClick={() =>
+                                  decidir(
+                                    a.tipo === "fijo" ? "fijo" : "suelta",
+                                    (a.turno_fijo_id ?? a.reserva_id)!,
+                                    "confirmar",
+                                  )
+                                }
+                                className="rounded-full bg-accent px-3 py-1 text-[12px] font-bold text-white hover:brightness-95"
+                              >
+                                Confirmar
+                              </button>
+                              <button
+                                onClick={() =>
+                                  decidir(
+                                    a.tipo === "fijo" ? "fijo" : "suelta",
+                                    (a.turno_fijo_id ?? a.reserva_id)!,
+                                    "rechazar",
+                                  )
+                                }
+                                className="text-[12px] font-semibold text-muted hover:text-danger"
+                              >
+                                Rechazar
+                              </button>
+                            </>
+                          ) : a.tipo === "fijo" && a.turno_fijo_id ? (
+                            <button
+                              onClick={() => noVieneHoy(a.turno_fijo_id!)}
+                              className="text-[12px] font-semibold text-muted hover:text-danger"
+                            >
+                              No viene hoy
+                            </button>
+                          ) : a.reserva_id ? (
+                            <button
+                              onClick={() => quitarSuelta(a.reserva_id!)}
+                              className="text-[12px] font-semibold text-muted hover:text-danger"
+                            >
+                              Quitar
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <p className="mt-3 text-[13px] text-faint">Nadie anotado todavía.</p>
@@ -515,6 +600,222 @@ function Horarios({ tenantId }: { tenantId: string }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Tab Socios: padrón + estado de cuota
+// ------------------------------------------------------------
+function sumarMesISO(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function fechaCorta(iso: string): string {
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(new Date(`${iso}T12:00:00Z`));
+}
+
+function Socios({ tenantId }: { tenantId: string }) {
+  const sb = createClient();
+  const [socios, setSocios] = useState<GymSocio[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      setSocios(await getGymAlumnos(sb));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cargar.");
+    } finally {
+      setCargando(false);
+    }
+  }, [sb]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  async function alta() {
+    setError(null);
+    if (!nombre.trim() || !telefono.trim()) {
+      setError("Nombre y WhatsApp obligatorios.");
+      return;
+    }
+    const tel = normalizeArPhone(telefono.trim());
+    if (tel.length < 10) {
+      setError("WhatsApp inválido.");
+      return;
+    }
+    setGuardando(true);
+    const { error } = await sb
+      .from("gym_alumnos")
+      .insert({ tenant_id: tenantId, nombre: nombre.trim(), telefono: tel });
+    setGuardando(false);
+    if (error) {
+      setError(
+        /duplicate|unique/i.test(error.message)
+          ? "Ya existe un alumno con ese WhatsApp."
+          : error.message,
+      );
+      return;
+    }
+    setNombre("");
+    setTelefono("");
+    cargar();
+  }
+
+  async function registrarPago(s: GymSocio) {
+    // Extiende un mes: desde su vencimiento si sigue vigente, o desde hoy.
+    const hoy = hoyISOArgentina();
+    const base = s.cuota_hasta && s.cuota_hasta > hoy ? s.cuota_hasta : hoy;
+    try {
+      await updateGymSocio(sb, s.id, { es_socio: true, cuota_hasta: sumarMesISO(base) });
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el pago.");
+    }
+  }
+
+  async function setMetodo(s: GymSocio, metodo: "efectivo" | "mercadopago") {
+    try {
+      await updateGymSocio(sb, s.id, { metodo_pago: metodo });
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo actualizar.");
+    }
+  }
+
+  const filtrados = socios.filter(
+    (s) =>
+      !q.trim() ||
+      s.nombre.toLowerCase().includes(q.toLowerCase()) ||
+      s.telefono.includes(q),
+  );
+
+  const input =
+    "rounded-lg border border-line bg-surface-2 px-3 py-2 text-[14px] text-ink outline-none focus:border-accent";
+
+  return (
+    <div className="space-y-4">
+      {/* Alta */}
+      <div className="space-y-2 rounded-panel border border-line bg-surface p-4 shadow-card">
+        <div className="text-[14px] font-bold">Agregar socio</div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Nombre y apellido"
+            className={`${input} min-w-0 flex-1`}
+          />
+          <input
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            placeholder="WhatsApp"
+            inputMode="tel"
+            className={`${input} min-w-0 flex-1`}
+          />
+          <button
+            onClick={alta}
+            disabled={guardando}
+            className="rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+          >
+            {guardando ? "…" : "Agregar"}
+          </button>
+        </div>
+      </div>
+
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Buscar por nombre o WhatsApp…"
+        className={`${input} w-full`}
+      />
+
+      {error && <p className="text-[13px] text-danger">{error}</p>}
+
+      {cargando ? (
+        <p className="py-8 text-center text-sm text-muted">Cargando…</p>
+      ) : filtrados.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted">
+          {socios.length === 0
+            ? "Todavía no hay alumnos. Aparecen acá cuando reservan, o agregalos arriba."
+            : "Sin resultados."}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {filtrados.map((s) => {
+            const vencida = cuotaVencida(s.es_socio, s.cuota_hasta);
+            return (
+              <div
+                key={s.id}
+                className="rounded-card border border-line bg-surface p-3 shadow-card"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-bold">{s.nombre}</div>
+                    <div className="text-[12px] text-muted">{s.telefono}</div>
+                  </div>
+                  <span
+                    className={[
+                      "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold",
+                      !vencida
+                        ? "bg-ok/15 text-ok"
+                        : s.es_socio
+                          ? "bg-danger/15 text-danger"
+                          : "bg-surface-2 text-muted",
+                    ].join(" ")}
+                  >
+                    {!vencida
+                      ? `Al día · vence ${fechaCorta(s.cuota_hasta as string)}`
+                      : s.es_socio
+                        ? s.cuota_hasta
+                          ? `Vencida ${fechaCorta(s.cuota_hasta)}`
+                          : "Sin pago"
+                        : "No socio"}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => registrarPago(s)}
+                    className="rounded-full bg-accent px-3 py-1.5 text-[12px] font-bold text-white hover:brightness-95"
+                  >
+                    Registrar pago (+1 mes)
+                  </button>
+                  <div className="flex rounded-full bg-surface-2 p-0.5">
+                    {(["efectivo", "mercadopago"] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMetodo(s, m)}
+                        className={[
+                          "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                          s.metodo_pago === m ? "bg-ink text-white" : "text-muted",
+                        ].join(" ")}
+                      >
+                        {m === "efectivo" ? "Efectivo" : "MercadoPago"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

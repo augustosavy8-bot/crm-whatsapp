@@ -24,8 +24,23 @@ export interface GymAlumnoEnClase {
   tipo: "fijo" | "suelto";
   alumno_id: string;
   nombre: string;
+  // suelta: 'pendiente' | 'confirmada' ; fijo: 'pendiente' | 'confirmado'
+  estado: string;
+  es_socio: boolean;
+  cuota_hasta: string | null;
   turno_fijo_id?: string;
   reserva_id?: string;
+}
+
+export interface GymSocio {
+  id: string;
+  nombre: string;
+  telefono: string;
+  email: string | null;
+  es_socio: boolean;
+  cuota_hasta: string | null;
+  metodo_pago: "efectivo" | "mercadopago";
+  created_at: string;
 }
 
 export interface GymOcupacionHorario {
@@ -97,5 +112,26 @@ export async function setGymHorarioActivo(
     .from("gym_horarios")
     .update({ activo })
     .eq("id", id);
+  if (error) throw error;
+}
+
+// --- Socios ---
+
+// Todos los alumnos del gimnasio (socios y no socios), para el padrón.
+export async function getGymAlumnos(sb: SupabaseClient): Promise<GymSocio[]> {
+  const { data, error } = await sb
+    .from("gym_alumnos")
+    .select("id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, created_at")
+    .order("nombre", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as GymSocio[];
+}
+
+export async function updateGymSocio(
+  sb: SupabaseClient,
+  id: string,
+  patch: Partial<Pick<GymSocio, "es_socio" | "cuota_hasta" | "metodo_pago">>,
+): Promise<void> {
+  const { error } = await sb.from("gym_alumnos").update(patch).eq("id", id);
   if (error) throw error;
 }

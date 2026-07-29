@@ -70,11 +70,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Lo agrega el propio admin: queda confirmado directo (no pasa por la cola
+    // de pendientes). El alta crea la reserva como 'pendiente' y acá la
+    // confirmamos con el cliente de sesión (RLS admin del tenant).
     if (tipo === "suelta") {
       const id = await reservarSuelta({ horarioId, fecha, nombre, telefono });
+      await sb.from("gym_reservas_sueltas").update({ estado: "confirmada" }).eq("id", id);
       return NextResponse.json({ ok: true, tipo, id });
     }
     const id = await anotarFijo({ horarioId, fechaDesde: fecha, nombre, telefono });
+    await sb.from("gym_turnos_fijos").update({ estado: "confirmado" }).eq("id", id);
     return NextResponse.json({ ok: true, tipo, id });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "No se pudo agregar.";

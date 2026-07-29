@@ -226,13 +226,14 @@ function Reservar() {
           ✓
         </div>
         <div className="space-y-1">
-          <h2 className="text-xl font-bold tracking-tight">
-            {listo.tipo === "fijo" ? "¡Quedaste anotado fijo!" : "¡Lugar reservado!"}
-          </h2>
+          <h2 className="text-xl font-bold tracking-tight">¡Reserva enviada!</h2>
           <p className="text-sm text-muted">
             {listo.tipo === "fijo"
               ? `Todas las semanas, ${DIAS_SEMANA[sel.dia_semana].toLowerCase()} de ${hhmm(sel.hora_inicio)} a ${hhmm(sel.hora_fin)}.`
               : `${fechaLarga(diaSel)} · ${hhmm(sel.hora_inicio)} hs.`}
+          </p>
+          <p className="pt-1 text-[13px] font-semibold text-warn">
+            Queda pendiente de confirmación del gimnasio.
           </p>
         </div>
         <button
@@ -549,16 +550,27 @@ function MisReservas() {
                     {hhmm(r.hora_inicio)} a {hhmm(r.hora_fin)} hs
                   </div>
                 </div>
-                <span
-                  className={[
-                    "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                    r.tipo === "fijo"
-                      ? "bg-accent-soft text-accent"
-                      : "bg-surface-2 text-muted",
-                  ].join(" ")}
-                >
-                  {r.tipo === "fijo" ? "Fijo" : "Suelta"}
-                </span>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {r.estado === "pendiente" ? (
+                    <span className="rounded-full bg-warn/15 px-2.5 py-1 text-[11px] font-bold text-warn">
+                      Pendiente
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-ok/15 px-2.5 py-1 text-[11px] font-bold text-ok">
+                      Confirmada
+                    </span>
+                  )}
+                  <span
+                    className={[
+                      "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                      r.tipo === "fijo"
+                        ? "bg-accent-soft text-accent"
+                        : "bg-surface-2 text-muted",
+                    ].join(" ")}
+                  >
+                    {r.tipo === "fijo" ? "Fijo" : "Suelta"}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
