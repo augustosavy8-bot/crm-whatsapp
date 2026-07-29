@@ -8,11 +8,6 @@ export default async function GimnasioLanding() {
   const gym = await getGymContext();
   const servicios = gym?.servicios ?? [];
 
-  // Profesionales únicos a partir de los servicios (1 servicio = 1 profe hoy).
-  const profesionales = servicios
-    .filter((s) => s.profesional_nombre)
-    .map((s) => ({ nombre: s.profesional_nombre as string, servicio: s.nombre }));
-
   return (
     <main className="min-h-dvh">
       {/* Hero */}
@@ -30,12 +25,12 @@ export default async function GimnasioLanding() {
           </div>
 
           <h1 className="max-w-xl text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl">
-            Entrená, recuperate y comé mejor.
-            <span className="text-accent"> En un solo lugar.</span>
+            Entrená mejor.
+            <span className="text-accent"> Reservá tu lugar.</span>
           </h1>
           <p className="mt-4 max-w-md text-[15px] text-white/70">
-            Sacá tu turno online en segundos, sin llamar ni esperar. Elegís el
-            servicio, el día y el horario. Listo.
+            Reservá tu turno de gimnasio online en segundos, sin llamar ni
+            esperar. Elegís el día y el horario. Listo.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -57,9 +52,9 @@ export default async function GimnasioLanding() {
 
       {/* Servicios */}
       <section className="mx-auto max-w-3xl px-5 py-12">
-        <h2 className="text-xl font-bold tracking-tight">Nuestros servicios</h2>
+        <h2 className="text-xl font-bold tracking-tight">Reservá tu turno</h2>
         <p className="mt-1 text-sm text-muted">
-          Elegí el que necesitás y reservá con el profesional.
+          Elegí el horario que mejor te queda y asegurá tu lugar.
         </p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -70,11 +65,6 @@ export default async function GimnasioLanding() {
               className="group flex flex-col rounded-panel border border-line bg-surface p-5 shadow-card transition-all hover:border-accent hover:shadow-pop"
             >
               <div className="text-[17px] font-bold">{s.nombre}</div>
-              {s.profesional_nombre && (
-                <div className="text-[13px] font-semibold text-accent">
-                  {s.profesional_nombre}
-                </div>
-              )}
               {s.descripcion && (
                 <p className="mt-2 flex-1 text-[13px] leading-relaxed text-muted">
                   {s.descripcion}
@@ -87,33 +77,6 @@ export default async function GimnasioLanding() {
           ))}
         </div>
       </section>
-
-      {/* Profesionales */}
-      {profesionales.length > 0 && (
-        <section className="mx-auto max-w-3xl px-5 pb-12">
-          <h2 className="text-xl font-bold tracking-tight">El equipo</h2>
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {profesionales.map((p) => (
-              <div
-                key={p.nombre}
-                className="flex items-center gap-3 rounded-panel border border-line bg-surface p-4 shadow-card"
-              >
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[15px] font-bold text-accent">
-                  {p.nombre
-                    .split(" ")
-                    .map((w) => w[0])
-                    .slice(0, 2)
-                    .join("")}
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-[14px] font-bold">{p.nombre}</div>
-                  <div className="truncate text-[12px] text-muted">{p.servicio}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* CTA final */}
       <section className="mx-auto max-w-3xl px-5 pb-16">

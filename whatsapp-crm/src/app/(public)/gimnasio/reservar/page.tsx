@@ -31,7 +31,12 @@ export default async function ReservarPage({
       >
         ← Volver
       </Link>
-      <ReservaFlow servicios={gym.servicios} servicioInicial={servicio ?? null} />
+      {/* Por ahora el gimnasio se presenta como "GIMNASIO", sin el nombre del
+          profesional: se oculta el profesional en el flujo público. */}
+      <ReservaFlow
+        servicios={gym.servicios.map((s) => ({ ...s, profesional_nombre: null }))}
+        servicioInicial={servicio ?? null}
+      />
     </main>
   );
 }
