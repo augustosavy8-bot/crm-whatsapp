@@ -17,10 +17,13 @@ export default async function GimnasioLanding() {
           className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent/30 blur-3xl"
         />
         <div className="relative mx-auto max-w-3xl px-5 pb-14 pt-8 sm:pt-12">
-          <div className="mb-10 flex items-center justify-between">
-            <span className="text-[15px] font-bold tracking-tight">
-              {gym?.nombre ?? "KINACTIVA"}
-            </span>
+          <div className="mb-10 flex items-center justify-between gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/kinactiva-logo.png"
+              alt="KINACTIVA — Centro Integral del Movimiento"
+              className="h-14 w-auto"
+            />
             <InstalarApp />
           </div>
 

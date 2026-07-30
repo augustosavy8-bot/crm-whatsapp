@@ -56,16 +56,14 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-canvas p-6">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-base font-bold text-white">
-            K
-          </div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight tracking-tight">
-              KINACTIVA
-            </h1>
-            <p className="text-xs text-muted">Panel interno</p>
-          </div>
+        <div className="mb-6 flex flex-col items-center gap-2 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/kinactiva-logo.png"
+            alt="KINACTIVA — Centro Integral del Movimiento"
+            className="h-24 w-auto"
+          />
+          <p className="text-xs text-muted">Panel interno</p>
         </div>
 
         <form
