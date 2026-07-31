@@ -9,7 +9,7 @@
 -- Se centraliza el gate en un helper para no repetir la condición en cada
 -- policy/función (y para el próximo cambio sea un solo lugar).
 --
--- Correr DESPUÉS de 0026.
+-- Correr DESPUÉS de 0028.
 -- ============================================================
 
 -- Predicado único: ¿el JWT es staff del gimnasio? owner, profesional o el

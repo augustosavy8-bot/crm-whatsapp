@@ -9,7 +9,7 @@
 -- El staff (agents) NO cambia: sigue resolviéndose primero. Un usuario es
 -- alumno solo si NO es agente y está vinculado a un gym_alumno.
 --
--- Correr DESPUÉS de 0025.
+-- Correr DESPUÉS de 0027 (la base ya tenía 0026/0027 de hardening).
 --
 -- NOTA (paso manual en Supabase): el Custom Access Token Hook ya está activo
 -- desde 0010 (Auth → Hooks). Esta migración solo REEMPLAZA la función; no hace
