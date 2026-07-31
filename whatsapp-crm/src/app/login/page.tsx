@@ -8,59 +8,31 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [mode, setMode] = useState<"login" | "registro">("login");
-  const [nombre, setNombre] = useState("");
-  const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Tras autenticar, la raíz decide a dónde va según el rol (alumno -> su
-  // panel; profesional/owner -> el panel interno). No decidimos acá.
-  async function irAlPanel() {
-    router.push("/");
-    router.refresh();
-  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        await irAlPanel();
-      } else {
-        // Registro de alumno: crea la cuenta + vincula su ficha, y recién
-        // después inicia sesión (así el token ya trae el rol de alumno).
-        const res = await fetch("/api/mi-cuenta/registro", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nombre, telefono, email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "No se pudo crear la cuenta.");
-
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        await irAlPanel();
-      }
-    } catch (err) {
-      setError((err as Error).message || "No se pudo autenticar.");
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      // La raíz decide a dónde va según el rol (alumno -> su panel;
+      // profesional/owner -> el panel interno).
+      router.push("/");
+      router.refresh();
+    } catch {
+      setError("Email o contraseña incorrectos.");
     } finally {
       setLoading(false);
     }
   }
-
-  const esRegistro = mode === "registro";
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-canvas p-6">
@@ -79,47 +51,11 @@ export default function LoginPage() {
           className="space-y-4 rounded-panel border border-line bg-surface p-6 shadow-card"
         >
           <div>
-            <h2 className="text-[15px] font-semibold">
-              {esRegistro ? "Creá tu cuenta" : "Iniciar sesión"}
-            </h2>
+            <h2 className="text-[15px] font-semibold">Iniciar sesión</h2>
             <p className="mt-0.5 text-xs text-muted">
-              {esRegistro
-                ? "Para reservar y ver tus clases del gimnasio."
-                : "Ingresá con tu email y contraseña."}
+              Ingresá con tu email y contraseña.
             </p>
           </div>
-
-          {esRegistro && (
-            <>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted">
-                  Nombre y apellido
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
-                  placeholder="Tu nombre"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted">
-                  WhatsApp
-                </label>
-                <input
-                  type="tel"
-                  required
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
-                  placeholder="Cód. de área + número"
-                />
-              </div>
-            </>
-          )}
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted">Email</label>
@@ -141,7 +77,7 @@ export default function LoginPage() {
             <input
               type="password"
               required
-              autoComplete={esRegistro ? "new-password" : "current-password"}
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2.5 text-ink outline-none placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/20"
@@ -156,25 +92,12 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:opacity-60"
           >
-            {loading
-              ? "Procesando…"
-              : esRegistro
-                ? "Crear cuenta"
-                : "Entrar"}
+            {loading ? "Procesando…" : "Entrar"}
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setMode(esRegistro ? "login" : "registro");
-              setError(null);
-            }}
-            className="w-full text-xs font-medium text-muted hover:text-ink"
-          >
-            {esRegistro
-              ? "Ya tengo cuenta · iniciar sesión"
-              : "¿Sos alumno y no tenés cuenta? Creá una"}
-          </button>
+          <p className="text-center text-[11px] text-faint">
+            ¿Sos alumno? Pedile el link de acceso al gimnasio.
+          </p>
         </form>
       </div>
     </main>

@@ -636,6 +636,9 @@ function Socios({ tenantId }: { tenantId: string }) {
   const [guardando, setGuardando] = useState(false);
   // Links de adhesión MP generados en esta sesión, por socio.
   const [mpLinks, setMpLinks] = useState<Record<string, string>>({});
+  // Links de invitación (crear cuenta) generados en esta sesión, por socio.
+  const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
+  const [copiado, setCopiado] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -727,6 +730,36 @@ function Socios({ tenantId }: { tenantId: string }) {
       setMpLinks((m) => ({ ...m, [s.id]: data.initPoint }));
     }
     cargar();
+  }
+
+  // Genera (o regenera) el link de invitación para que el alumno cree su
+  // cuenta, y lo copia al portapapeles. Sin este link nadie puede registrarse.
+  async function invitar(s: GymSocio) {
+    setError(null);
+    const res = await fetch("/api/gym/admin/invitar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alumnoId: s.id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "No se pudo generar la invitación.");
+      return;
+    }
+    const link = `${window.location.origin}/registro?token=${data.token}`;
+    setInviteLinks((m) => ({ ...m, [s.id]: link }));
+    await copiar(s.id, link);
+    cargar();
+  }
+
+  async function copiar(id: string, texto: string) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(id);
+      setTimeout(() => setCopiado((c) => (c === id ? null : c)), 2000);
+    } catch {
+      // Clipboard bloqueado: el link igual queda visible para copiar a mano.
+    }
   }
 
   const filtrados = socios.filter(
@@ -874,6 +907,54 @@ function Socios({ tenantId }: { tenantId: string }) {
                     )}
                   </div>
                 )}
+
+                {/* Acceso: link de invitación para crear cuenta */}
+                <div className="mt-2 border-t border-line pt-2">
+                  {s.auth_user_id ? (
+                    <span className="text-[12px] font-semibold text-ok">
+                      ✓ Tiene cuenta de alumno
+                    </span>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => invitar(s)}
+                          className="text-[12px] font-semibold text-accent hover:brightness-90"
+                        >
+                          {inviteLinks[s.id]
+                            ? "Generar nuevo link de acceso"
+                            : "Generar link de acceso"}
+                        </button>
+                        {copiado === s.id && (
+                          <span className="text-[11px] font-semibold text-ok">
+                            ¡Copiado!
+                          </span>
+                        )}
+                        {!inviteLinks[s.id] && s.invite_token && (
+                          <span className="text-[11px] text-muted">
+                            · invitación pendiente
+                          </span>
+                        )}
+                      </div>
+                      {inviteLinks[s.id] && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            readOnly
+                            value={inviteLinks[s.id]}
+                            onFocus={(e) => e.currentTarget.select()}
+                            className="min-w-0 flex-1 truncate rounded-lg bg-surface-2 px-2 py-1.5 text-[11px] text-muted"
+                          />
+                          <button
+                            onClick={() => copiar(s.id, inviteLinks[s.id])}
+                            className="shrink-0 rounded-full bg-ink px-3 py-1 text-[11px] font-bold text-white"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}

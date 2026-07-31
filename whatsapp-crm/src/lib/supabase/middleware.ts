@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
   const isPublic =
     path === "/" || // la raíz decide sola: público -> /gimnasio, staff -> /dashboard
     path === "/login" ||
+    path === "/registro" || // alta de alumno por invitación (token en la URL)
     path.startsWith("/auth") ||
     path === "/privacy" ||
     path.startsWith("/privacy/") ||
