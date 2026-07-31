@@ -25,6 +25,21 @@ function authHeaders(): HeadersInit {
   };
 }
 
+// Arma un mensaje legible con el detalle real que devuelve MercadoPago
+// (status + message + cause), para poder diagnosticar sin adivinar.
+function mpError(status: number, data: Record<string, unknown>): Error {
+  const cause = Array.isArray(data.cause)
+    ? (data.cause as Array<Record<string, unknown>>)
+        .map((c) => (c.description as string) || (c.code as string))
+        .filter(Boolean)
+        .join("; ")
+    : "";
+  const base = (data.message as string) || (data.error as string) || "error";
+  return new Error(
+    `MercadoPago ${status}: ${base}${cause ? ` — ${cause}` : ""}`,
+  );
+}
+
 export interface Preapproval {
   id: string;
   status: string; // pending | authorized | paused | cancelled
@@ -59,11 +74,7 @@ export async function crearPreapproval(args: {
     }),
   });
   const data = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    throw new Error(
-      (data.message as string) || `MercadoPago respondió ${res.status}`,
-    );
-  }
+  if (!res.ok) throw mpError(res.status, data);
   return data as unknown as Preapproval;
 }
 
@@ -83,9 +94,7 @@ export async function actualizarPreapprovalMonto(
   });
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    throw new Error(
-      (data.message as string) || `MercadoPago respondió ${res.status}`,
-    );
+    throw mpError(res.status, data);
   }
 }
 
