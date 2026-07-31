@@ -51,8 +51,8 @@ export default async function AppLayout({
 
   const contenido = (
     <div className="flex h-[100dvh] flex-col bg-canvas">
-      <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-4 py-2.5">
-        <div className="flex items-center gap-2">
+      <header className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
+        <div className="flex shrink-0 items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/kinactiva-mark.png"
@@ -60,17 +60,19 @@ export default async function AppLayout({
             aria-hidden
             className="h-7 w-auto"
           />
-          <span className="text-[17px] font-extrabold tracking-tight">
+          <span className="hidden text-[17px] font-extrabold tracking-tight sm:inline">
             <span className="text-brand">KIN</span>
             <span className="text-accent">ACTIVA</span>
           </span>
         </div>
-        <HeaderNav
-          role={agente?.role}
-          inboxEnabled={modulos.inbox}
-          gymAdmin={esGymAdmin}
-        />
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-1 justify-center overflow-x-auto">
+          <HeaderNav
+            role={agente?.role}
+            inboxEnabled={modulos.inbox}
+            gymAdmin={esGymAdmin}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <span className="hidden text-xs text-muted lg:block">
             {user.email}
           </span>
