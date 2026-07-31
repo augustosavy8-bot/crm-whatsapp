@@ -216,9 +216,9 @@ export default function ReservaFlow({
                 key={d.iso}
                 onClick={() => setDiaSel(d.iso)}
                 className={[
-                  "flex min-w-[58px] shrink-0 flex-col items-center rounded-card border px-2 py-2.5 transition-colors",
+                  "flex min-w-[58px] shrink-0 flex-col items-center rounded-card border px-2 py-2.5 transition-all duration-200 ease-out",
                   activo
-                    ? "border-accent bg-accent text-white"
+                    ? "scale-[1.04] border-accent bg-accent text-white shadow-[0_8px_20px_-10px_rgba(238,106,51,.7)]"
                     : "border-line bg-surface text-ink hover:border-accent",
                 ].join(" ")}
               >
@@ -246,7 +246,18 @@ export default function ReservaFlow({
             </p>
           )}
           {diaSel && cargandoSlots && (
-            <p className="pt-6 text-center text-sm text-muted">Buscando horarios…</p>
+            <div className="space-y-3">
+              <p className="text-center text-sm text-muted">Buscando horarios…</p>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="kf-skeleton h-[42px] rounded-xl"
+                    style={{ animationDelay: `${i * 70}ms` }}
+                  />
+                ))}
+              </div>
+            </div>
           )}
           {diaSel && !cargandoSlots && slots.length === 0 && (
             <p className="pt-6 text-center text-sm text-muted">
@@ -255,16 +266,20 @@ export default function ReservaFlow({
           )}
           {diaSel && !cargandoSlots && slots.length > 0 && (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {slots.map((iso) => {
+              {slots.map((iso, i) => {
                 const activo = iso === slotSel;
                 return (
                   <button
                     key={iso}
                     onClick={() => setSlotSel(iso)}
+                    style={{
+                      animation: "kfRise .32s cubic-bezier(.2,.8,.25,1) both",
+                      animationDelay: `${i * 35}ms`,
+                    }}
                     className={[
-                      "rounded-xl border py-2.5 text-sm font-semibold transition-colors",
+                      "rounded-xl border py-2.5 text-sm font-semibold transition-all duration-200 ease-out",
                       activo
-                        ? "border-accent bg-accent text-white"
+                        ? "scale-105 border-accent bg-accent text-white shadow-[0_8px_20px_-10px_rgba(238,106,51,.7)]"
                         : "border-line bg-surface text-ink hover:border-accent",
                     ].join(" ")}
                   >
@@ -281,9 +296,16 @@ export default function ReservaFlow({
         <button
           disabled={!slotSel}
           onClick={() => setPaso("datos")}
-          className="w-full rounded-full bg-ink py-3.5 text-sm font-bold text-white transition-colors hover:bg-ink/90 disabled:opacity-40"
+          className="relative w-full overflow-hidden rounded-full bg-ink py-3.5 text-sm font-bold text-white transition-transform hover:bg-ink/90 active:scale-[.985] disabled:opacity-40"
         >
-          Continuar
+          {slotSel && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-0 w-2/5 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+              style={{ animation: "kfSheen 2.6s ease-in-out 1.2s infinite" }}
+            />
+          )}
+          <span className="relative">Continuar</span>
         </button>
       </div>
     );
@@ -365,9 +387,27 @@ export default function ReservaFlow({
         <button
           type="submit"
           disabled={enviando}
-          className="w-full rounded-full bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:opacity-50"
+          className="w-full rounded-full bg-accent py-3.5 text-sm font-bold text-white transition-transform hover:brightness-95 active:scale-[.985] disabled:opacity-50"
         >
-          {enviando ? "Reservando…" : "Confirmar turno"}
+          {enviando ? (
+            <span className="inline-flex items-center gap-1.5">
+              Reservando
+              <span className="inline-flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="h-1 w-1 rounded-full bg-white"
+                    style={{
+                      animation: "kfDots 1s ease-in-out infinite",
+                      animationDelay: `${i * 0.15}s`,
+                    }}
+                  />
+                ))}
+              </span>
+            </span>
+          ) : (
+            "Confirmar turno"
+          )}
         </button>
       </form>
     );
@@ -377,16 +417,47 @@ export default function ReservaFlow({
   if (paso === "listo" && servicio && slotSel) {
     return (
       <div className="flex flex-col items-center gap-4 pt-8 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ok/15 text-3xl">
-          ✓
+        <div className="relative flex h-16 w-16 items-center justify-center">
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-full border-2 border-ok"
+            style={{ animation: "kfRing 1.5s ease-out infinite", animationDelay: ".1s" }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-full border-2 border-ok"
+            style={{ animation: "kfRing 1.5s ease-out infinite", animationDelay: ".45s" }}
+          />
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ok/15">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M20 6 9 17l-5-5"
+                stroke="#2fae6b"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  strokeDasharray: 34,
+                  strokeDashoffset: 34,
+                  animation: "kfCheck .5s cubic-bezier(.4,0,.2,1) .22s forwards",
+                }}
+              />
+            </svg>
+          </div>
         </div>
-        <div className="space-y-1">
+        <div
+          className="space-y-1"
+          style={{ animation: "kfRise .4s cubic-bezier(.2,.8,.25,1) both", animationDelay: ".12s" }}
+        >
           <h1 className="text-2xl font-bold tracking-tight">¡Turno reservado!</h1>
           <p className="text-sm text-muted">
             Te esperamos. Si necesitás reprogramar, escribinos por WhatsApp.
           </p>
         </div>
-        <div className="w-full rounded-card border border-line bg-surface-2 p-4 text-left text-sm">
+        <div
+          className="w-full rounded-card border border-line bg-surface-2 p-4 text-left text-sm"
+          style={{ animation: "kfRise .4s cubic-bezier(.2,.8,.25,1) both", animationDelay: ".2s" }}
+        >
           <div className="font-bold">{servicio.nombre}</div>
           {servicio.profesional_nombre && (
             <div className="text-muted">con {servicio.profesional_nombre}</div>
@@ -401,7 +472,10 @@ export default function ReservaFlow({
             · {formatArHora(slotSel)} hs
           </div>
         </div>
-        <p className="text-[13px] text-muted">
+        <p
+          className="text-[13px] text-muted"
+          style={{ animation: "kfRise .4s cubic-bezier(.2,.8,.25,1) both", animationDelay: ".3s" }}
+        >
           Tu turno queda <strong>pendiente de confirmación</strong> del gimnasio.
         </p>
       </div>

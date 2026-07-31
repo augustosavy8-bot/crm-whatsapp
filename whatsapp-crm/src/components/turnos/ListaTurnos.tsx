@@ -41,6 +41,7 @@ export default function ListaTurnos({
   const [verAnteriores, setVerAnteriores] = useState(false);
   const [filtro, setFiltro] = useState<FiltroEstado>("todos");
   const [procesando, setProcesando] = useState<string | null>(null);
+  const [recienConfirmado, setRecienConfirmado] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const hoy = hoyISOArgentina();
@@ -113,6 +114,12 @@ export default function ListaTurnos({
     }
     setTurnos((ts) =>
       ts.map((x) => (x.id === t.id ? { ...x, estado: "confirmado" } : x)),
+    );
+    // Gatilla la animación de la fila/chip por ~1.4s.
+    setRecienConfirmado(t.id);
+    setTimeout(
+      () => setRecienConfirmado((id) => (id === t.id ? null : id)),
+      1400,
     );
     setToast(
       r.warning
@@ -201,6 +208,7 @@ export default function ListaTurnos({
                       turno={t}
                       esOwner={esOwner}
                       procesando={procesando === t.id}
+                      recienConfirmado={recienConfirmado === t.id}
                       onConfirmar={() => confirmar(t)}
                       onAtendido={() => marcar(t, "atendido")}
                       onAusente={() => marcar(t, "ausente")}
@@ -235,6 +243,7 @@ function ItemTurno({
   turno: t,
   esOwner,
   procesando,
+  recienConfirmado,
   onConfirmar,
   onAtendido,
   onAusente,
@@ -243,13 +252,40 @@ function ItemTurno({
   turno: TurnoConDetalle;
   esOwner: boolean;
   procesando: boolean;
+  recienConfirmado: boolean;
   onConfirmar: () => void;
   onAtendido: () => void;
   onAusente: () => void;
   onWhatsApp: () => void;
 }) {
+  // Barra lateral: ámbar si está pendiente, verde si confirmado.
+  const barra =
+    t.estado === "pendiente"
+      ? "#f2911f"
+      : t.estado === "confirmado"
+        ? "#2fae6b"
+        : null;
   return (
-    <li className="px-3 py-2.5">
+    <li
+      className="relative px-3 py-2.5"
+      style={
+        recienConfirmado
+          ? { animation: "kfOkFlash 1.2s ease-out" }
+          : undefined
+      }
+    >
+      {barra && (
+        <span
+          aria-hidden
+          className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r"
+          style={{
+            background: barra,
+            ...(t.estado === "confirmado" && recienConfirmado
+              ? { transformOrigin: "top", animation: "kfBar .4s ease-out both" }
+              : {}),
+          }}
+        />
+      )}
       <div className="flex items-center gap-3">
         {/* Hora grande */}
         <div className="w-14 shrink-0 text-center">
@@ -280,7 +316,15 @@ function ItemTurno({
         {/* Chip de estado */}
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${ESTADO_COLOR[t.estado]}`}
+          style={
+            recienConfirmado
+              ? { animation: "kfPop .45s cubic-bezier(.2,.8,.25,1)" }
+              : undefined
+          }
         >
+          {recienConfirmado && t.estado === "confirmado" && (
+            <span className="mr-0.5">✓</span>
+          )}
           {ESTADO_LABEL[t.estado]}
         </span>
       </div>
@@ -293,7 +337,17 @@ function ItemTurno({
             disabled={procesando}
             className="bg-ok/15 text-ok"
           >
-            ✓ Confirmar
+            {procesando ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-3 w-3 rounded-full border-2 border-ok/30 border-t-ok"
+                  style={{ animation: "kfSpin .7s linear infinite" }}
+                />
+                Confirmando…
+              </span>
+            ) : (
+              "✓ Confirmar"
+            )}
           </AccionBtn>
         )}
         <AccionBtn
@@ -333,7 +387,7 @@ function AccionBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50 ${className}`}
+      className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition-transform active:scale-[.96] disabled:opacity-50 ${className}`}
     >
       {children}
     </button>

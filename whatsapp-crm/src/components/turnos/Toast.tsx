@@ -25,12 +25,31 @@ export function Toast({
   return (
     <div className="fixed inset-x-0 bottom-4 z-[60] flex justify-center px-4">
       <div
-        className={`flex items-center gap-3 rounded-full border px-4 py-2.5 text-[13px] font-semibold shadow-card ${
+        style={{ animation: "kfToast .5s cubic-bezier(.2,.8,.25,1)" }}
+        className={`flex items-center gap-3 rounded-full border px-4 py-2.5 text-[13px] font-semibold shadow-pop ${
           toast.tipo === "error"
             ? "border-danger/30 bg-danger/10 text-danger"
             : "border-line bg-surface text-ink"
         }`}
       >
+        {toast.tipo === "ok" && (
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ok/15 text-ok">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M20 6 9 17l-5-5"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  strokeDasharray: 34,
+                  strokeDashoffset: 34,
+                  animation: "kfCheck .5s cubic-bezier(.4,0,.2,1) .15s forwards",
+                }}
+              />
+            </svg>
+          </span>
+        )}
         <span>{toast.mensaje}</span>
         {toast.accion && (
           <button
