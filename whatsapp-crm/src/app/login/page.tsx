@@ -36,13 +36,35 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-canvas p-6">
-      <div className="w-full max-w-sm">
+      {/* Pantalla de carga: al entrar, el panel se desvanece y el logo toma el
+          centro con la animación de movimiento — para que se sienta acción. */}
+      <div
+        aria-hidden={!loading}
+        className={[
+          "fixed inset-0 z-50 flex items-center justify-center bg-canvas transition-opacity duration-500",
+          loading ? "opacity-100" : "pointer-events-none opacity-0",
+        ].join(" ")}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/kinactiva-logo.png"
+          alt="Entrando a KINACTIVA…"
+          className="h-32 w-auto logo-entrando"
+        />
+      </div>
+
+      <div
+        className={[
+          "w-full max-w-sm transition-all duration-500",
+          loading ? "scale-95 opacity-0" : "opacity-100",
+        ].join(" ")}
+      >
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/kinactiva-logo.png"
             alt="KINACTIVA — Centro Integral del Movimiento"
-            className={`h-24 w-auto${loading ? " logo-entrando" : ""}`}
+            className="h-24 w-auto"
           />
         </div>
 
