@@ -4,6 +4,19 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+// Lee el claim app_role del JWT sin verificar ni pegar a la red (solo para
+// decidir a dónde ir; el servidor revalida de todas formas).
+function leerAppRole(token: string | undefined): string | undefined {
+  if (!token) return undefined;
+  try {
+    let b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    b64 += "=".repeat((4 - (b64.length % 4)) % 4);
+    return JSON.parse(atob(b64)).app_role as string | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -18,18 +31,23 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
-      // La raíz decide a dónde va según el rol (alumno -> su panel;
-      // profesional/owner -> el panel interno).
-      router.push("/");
-      router.refresh();
+
+      // Ruteo directo por rol para evitar el salto extra por "/": el rol se lee
+      // del propio token (sin llamadas de red), así vamos derecho al panel. El
+      // middleware/servidor igual revalidan.
+      const rol = leerAppRole(data.session?.access_token);
+      const destino =
+        rol === "alumno" ? "/mi-cuenta" : rol === "profesional" ? "/gym" : "/";
+      // En éxito NO apagamos el loading: el overlay queda hasta que navega, sin
+      // que reaparezca el form. La navegación desmonta esta página.
+      router.replace(destino);
     } catch {
       setError("Email o contraseña incorrectos.");
-    } finally {
       setLoading(false);
     }
   }
@@ -41,7 +59,7 @@ export default function LoginPage() {
       <div
         aria-hidden={!loading}
         className={[
-          "fixed inset-0 z-50 flex items-center justify-center bg-canvas transition-opacity duration-500",
+          "fixed inset-0 z-50 flex items-center justify-center bg-canvas transition-opacity duration-300",
           loading ? "opacity-100" : "pointer-events-none opacity-0",
         ].join(" ")}
       >
@@ -55,7 +73,7 @@ export default function LoginPage() {
 
       <div
         className={[
-          "w-full max-w-sm transition-all duration-500",
+          "w-full max-w-sm transition-all duration-300",
           loading ? "scale-95 opacity-0" : "opacity-100",
         ].join(" ")}
       >
