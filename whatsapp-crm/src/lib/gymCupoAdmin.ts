@@ -149,7 +149,9 @@ export async function getGymAlumnos(sb: SupabaseClient): Promise<GymSocio[]> {
 export async function updateGymSocio(
   sb: SupabaseClient,
   id: string,
-  patch: Partial<Pick<GymSocio, "es_socio" | "cuota_hasta" | "metodo_pago">>,
+  patch: Partial<
+    Pick<GymSocio, "es_socio" | "cuota_hasta" | "metodo_pago" | "email">
+  >,
 ): Promise<void> {
   const { error } = await sb.from("gym_alumnos").update(patch).eq("id", id);
   if (error) throw error;

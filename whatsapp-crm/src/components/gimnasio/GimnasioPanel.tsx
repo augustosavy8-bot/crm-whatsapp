@@ -871,6 +871,9 @@ function Socios({ tenantId }: { tenantId: string }) {
   // Links de invitación (crear cuenta) generados en esta sesión, por socio.
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
   const [copiado, setCopiado] = useState<string | null>(null);
+  // Edición inline del email por socio (necesario para MercadoPago).
+  const [editEmailId, setEditEmailId] = useState<string | null>(null);
+  const [emailVal, setEmailVal] = useState("");
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -901,6 +904,17 @@ function Socios({ tenantId }: { tenantId: string }) {
     else {
       const d = await res.json().catch(() => ({}));
       setError(d.error || "No se pudo cambiar el plan.");
+    }
+  }
+
+  async function guardarEmail(s: GymSocio) {
+    setError(null);
+    try {
+      await updateGymSocio(sb, s.id, { email: emailVal.trim() || null });
+      setEditEmailId(null);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar el email.");
     }
   }
 
@@ -1123,6 +1137,51 @@ function Socios({ tenantId }: { tenantId: string }) {
                     <span className="text-[12px] text-muted">
                       cuota {precioAR(s.plan.precio)}/mes
                     </span>
+                  )}
+                </div>
+
+                {/* Email (lo usa MercadoPago como pagador) */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-semibold text-muted">
+                    Email
+                  </span>
+                  {editEmailId === s.id ? (
+                    <>
+                      <input
+                        type="email"
+                        value={emailVal}
+                        onChange={(e) => setEmailVal(e.target.value)}
+                        placeholder="email@ejemplo.com"
+                        className="min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-2 py-1 text-[12px] text-ink outline-none focus:border-accent"
+                      />
+                      <button
+                        onClick={() => guardarEmail(s)}
+                        className="rounded-full bg-ink px-3 py-1 text-[11px] font-bold text-white"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        onClick={() => setEditEmailId(null)}
+                        className="text-[11px] font-semibold text-muted"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[12px] text-muted">
+                        {s.email || "—"}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setEditEmailId(s.id);
+                          setEmailVal(s.email ?? "");
+                        }}
+                        className="text-[11px] font-semibold text-accent hover:brightness-90"
+                      >
+                        Editar
+                      </button>
+                    </>
                   )}
                 </div>
 
