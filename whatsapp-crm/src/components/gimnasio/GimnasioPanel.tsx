@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LuBell } from "react-icons/lu";
 import { createClient } from "@/lib/supabase/client";
+import { Toast } from "@/components/turnos/Toast";
 import {
   crearGymHorario,
   getGymAlumnos,
@@ -321,6 +323,8 @@ function Agenda() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [agregarA, setAgregarA] = useState<string | null>(null); // horario_id
+  const [novedad, setNovedad] = useState(false); // campana con aviso
+  const [aviso, setAviso] = useState<string | null>(null); // toast realtime
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -338,6 +342,48 @@ function Agenda() {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // Ref a cargar para usarlo en el canal realtime sin re-suscribir por fecha.
+  const cargarRef = useRef(cargar);
+  useEffect(() => {
+    cargarRef.current = cargar;
+  }, [cargar]);
+
+  // Realtime: un alumno se anota -> entra en vivo, campana + toast.
+  useEffect(() => {
+    async function onInsert(payload: { new?: { alumno_id?: string } }) {
+      setNovedad(true);
+      let nombre = "un alumno";
+      const alumnoId = payload.new?.alumno_id;
+      if (alumnoId) {
+        const { data: a } = await sb
+          .from("gym_alumnos")
+          .select("nombre")
+          .eq("id", alumnoId)
+          .maybeSingle();
+        if (a?.nombre) nombre = a.nombre as string;
+      }
+      setAviso(`Nuevo turno · ${nombre}`);
+      cargarRef.current();
+      setTimeout(() => setNovedad(false), 6000);
+    }
+    const ch = sb
+      .channel("gym-reservas-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "gym_reservas_sueltas" },
+        onInsert,
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "gym_turnos_fijos" },
+        onInsert,
+      )
+      .subscribe();
+    return () => {
+      sb.removeChannel(ch);
+    };
+  }, [sb]);
 
   const hoy = hoyISOArgentina();
 
@@ -387,6 +433,39 @@ function Agenda() {
 
   return (
     <div className="space-y-4">
+      {/* Campana de novedades en vivo */}
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] font-semibold text-muted">
+          Agenda del día
+        </span>
+        <button
+          onClick={() => {
+            setNovedad(false);
+            cargar();
+          }}
+          title={novedad ? "Nuevo turno recibido" : "Avisos en vivo"}
+          className={[
+            "relative flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+            novedad
+              ? "bg-accent-soft text-accent"
+              : "bg-surface-2 text-muted hover:text-ink",
+          ].join(" ")}
+        >
+          <span
+            className="flex"
+            style={novedad ? { animation: "kfBell .9s ease-in-out 2" } : undefined}
+          >
+            <LuBell size={17} />
+          </span>
+          {novedad && (
+            <span
+              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-accent"
+              style={{ animation: "kfPop .4s" }}
+            />
+          )}
+        </button>
+      </div>
+
       {/* Navegación de día */}
       <div className="flex items-center justify-between gap-2">
         <button
@@ -556,6 +635,13 @@ function Agenda() {
             </div>
           );
         })}
+
+      {aviso && (
+        <Toast
+          toast={{ tipo: "ok", mensaje: aviso }}
+          onClose={() => setAviso(null)}
+        />
+      )}
     </div>
   );
 }
