@@ -6,6 +6,7 @@ import HeaderNav from "@/components/HeaderNav";
 import NotificationsProvider from "@/components/notifications/NotificationsProvider";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import PushButton from "@/components/notifications/PushButton";
+import AvisoNuevoTurno from "@/components/notifications/AvisoNuevoTurno";
 
 // Shell protegido: sin sesión no se entra (además del proxy, por las dudas).
 export default async function AppLayout({
@@ -26,6 +27,10 @@ export default async function AppLayout({
     .maybeSingle();
   const esProfesional = agente?.role === "profesional";
   const esGymAdmin = agente?.gym_admin === true;
+  // Staff del gimnasio (owner | profesional | gym_admin): reciben el aviso
+  // in-app cuando un alumno se anota, desde cualquier pantalla del panel.
+  const esGymStaff =
+    agente?.role === "owner" || esProfesional || esGymAdmin;
 
   // Módulos del tenant: una sola lectura por request, se baja por props.
   // El profesional tiene nav fija (gimnasio + su agenda), no depende de esto.
@@ -71,6 +76,8 @@ export default async function AppLayout({
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
+      {/* Aviso in-app de reserva nueva (global): solo para el staff del gym. */}
+      {esGymStaff && <AvisoNuevoTurno />}
     </div>
   );
 

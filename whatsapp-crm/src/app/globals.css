@@ -160,6 +160,25 @@ select {
 }
 @keyframes kfSpin { to { transform: rotate(360deg); } }
 
+/* "Aviso Nuevo Turno": banner in-app que le entra al staff cuando un alumno
+   se anota, desde cualquier pantalla del panel. Reusa kfPop/kfCheck/kfBell. */
+@keyframes avBaja {
+  0%   { opacity: 0; transform: translateY(-118%) scale(0.97); }
+  62%  { opacity: 1; transform: translateY(6px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes avSale {
+  to { opacity: 0; transform: translateY(-120%) scale(0.96); }
+}
+@keyframes avBarra {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+@keyframes avPulso {
+  0%   { opacity: 0.5; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+
 /* Skeleton shimmer para la carga de horarios. */
 .kf-skeleton {
   background: linear-gradient(90deg, #f6f4f2, #efece9 40%, #f6f4f2 80%);
