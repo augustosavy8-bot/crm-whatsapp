@@ -20,9 +20,9 @@ export default async function GimnasioLanding() {
           <div className="mb-10 flex items-center justify-between gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/kinactiva-logo.png"
+              src="/kinactiva-logo-light.png"
               alt="KINACTIVA — Centro Integral del Movimiento"
-              className="h-14 w-auto"
+              className="h-16 w-auto"
             />
             <InstalarApp />
           </div>

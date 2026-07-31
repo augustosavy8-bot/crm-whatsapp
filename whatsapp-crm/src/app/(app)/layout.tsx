@@ -53,6 +53,13 @@ export default async function AppLayout({
     <div className="flex h-[100dvh] flex-col bg-canvas">
       <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-4 py-2.5">
         <div className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/kinactiva-mark.png"
+            alt=""
+            aria-hidden
+            className="h-7 w-auto"
+          />
           <span className="text-[17px] font-extrabold tracking-tight">
             <span className="text-brand">KIN</span>
             <span className="text-accent">ACTIVA</span>
