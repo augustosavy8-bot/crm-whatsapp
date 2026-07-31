@@ -4,6 +4,7 @@ import { getCurrentAlumno } from "@/lib/alumno";
 import { getGymContext } from "@/lib/gym";
 import { hoyISOArgentina } from "@/lib/tz";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
+import InstruccionesInstalar from "@/components/gimnasio/InstruccionesInstalar";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,8 @@ export default async function MiCuentaPage() {
         gimnasioNombre={gym?.nombre ?? "KINACTIVA"}
         sesion={{ nombre: alumno.nombre, telefono: alumno.telefono }}
       />
+
+      <InstruccionesInstalar />
     </main>
   );
 }
