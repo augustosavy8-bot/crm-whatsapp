@@ -32,6 +32,16 @@ export interface GymAlumnoEnClase {
   reserva_id?: string;
 }
 
+export interface GymPlan {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  dias_semana: number | null;
+  precio: number;
+  activo: boolean;
+  orden: number;
+}
+
 export interface GymSocio {
   id: string;
   nombre: string;
@@ -46,6 +56,8 @@ export interface GymSocio {
   auth_user_id: string | null; // tiene cuenta de login
   invite_token: string | null; // invitación pendiente
   invite_expires_at: string | null;
+  plan_id: string | null;
+  plan: Pick<GymPlan, "id" | "nombre" | "precio" | "dias_semana"> | null;
 }
 
 export interface GymOcupacionHorario {
@@ -127,11 +139,11 @@ export async function getGymAlumnos(sb: SupabaseClient): Promise<GymSocio[]> {
   const { data, error } = await sb
     .from("gym_alumnos")
     .select(
-      "id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, mp_preapproval_id, mp_estado, created_at, auth_user_id, invite_token, invite_expires_at",
+      "id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, mp_preapproval_id, mp_estado, created_at, auth_user_id, invite_token, invite_expires_at, plan_id, plan:gym_planes(id, nombre, precio, dias_semana)",
     )
     .order("nombre", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as GymSocio[];
+  return (data ?? []) as unknown as GymSocio[];
 }
 
 export async function updateGymSocio(
@@ -142,3 +154,16 @@ export async function updateGymSocio(
   const { error } = await sb.from("gym_alumnos").update(patch).eq("id", id);
   if (error) throw error;
 }
+
+// --- Planes ---
+
+export async function getPlanes(sb: SupabaseClient): Promise<GymPlan[]> {
+  const { data, error } = await sb
+    .from("gym_planes")
+    .select("*")
+    .order("orden", { ascending: true })
+    .order("precio", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as GymPlan[];
+}
+

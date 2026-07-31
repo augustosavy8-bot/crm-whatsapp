@@ -6,20 +6,16 @@ import crypto from "node:crypto";
 //
 // TODO(cuenta MP): cablear las env vars cuando el gimnasio tenga su cuenta:
 //   MP_ACCESS_TOKEN     access token de PRODUCCIÓN (o TEST para probar)
-//   MP_CUOTA_MONTO      monto de la cuota mensual, en pesos (ej. 15000)
 //   MP_WEBHOOK_SECRET   "clave secreta" del webhook (para validar la firma)
-// Mientras no estén, mpConfigurado() es false y todo el flujo queda apagado
-// sin romper nada.
+// El monto de la cuota NO es una env var: sale del precio del plan del socio
+// (tabla gym_planes). Mientras no haya token, mpConfigurado() es false y todo
+// el flujo queda apagado sin romper nada.
 // ============================================================
 
 const MP_API = "https://api.mercadopago.com";
 
 export function mpConfigurado(): boolean {
-  return Boolean(process.env.MP_ACCESS_TOKEN && process.env.MP_CUOTA_MONTO);
-}
-
-export function mpCuotaMonto(): number {
-  return Number(process.env.MP_CUOTA_MONTO ?? 0);
+  return Boolean(process.env.MP_ACCESS_TOKEN);
 }
 
 function authHeaders(): HeadersInit {
@@ -69,6 +65,28 @@ export async function crearPreapproval(args: {
     );
   }
   return data as unknown as Preapproval;
+}
+
+// Actualiza el monto de una suscripción existente (cuando cambia el precio del
+// plan). MP aplica el nuevo monto en el próximo cobro. Solo tiene sentido sobre
+// suscripciones activas/pendientes (authorized|pending).
+export async function actualizarPreapprovalMonto(
+  id: string,
+  montoARS: number,
+): Promise<void> {
+  const res = await fetch(`${MP_API}/preapproval/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      auto_recurring: { transaction_amount: montoARS, currency_id: "ARS" },
+    }),
+  });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    throw new Error(
+      (data.message as string) || `MercadoPago respondió ${res.status}`,
+    );
+  }
 }
 
 export async function getPreapproval(id: string): Promise<Preapproval> {

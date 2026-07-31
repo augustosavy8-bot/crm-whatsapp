@@ -7,10 +7,12 @@ import {
   getGymAlumnos,
   getGymHorarios,
   getGymOcupacion,
+  getPlanes,
   setGymHorarioActivo,
   updateGymSocio,
   type GymHorario,
   type GymOcupacionHorario,
+  type GymPlan,
   type GymSocio,
 } from "@/lib/gymCupoAdmin";
 import { hoyISOArgentina, sumarDiasISO } from "@/lib/tz";
@@ -42,9 +44,19 @@ function fechaTitulo(iso: string): string {
 const TABS = [
   { key: "agenda", label: "Agenda" },
   { key: "socios", label: "Socios" },
+  { key: "planes", label: "Planes" },
   { key: "horarios", label: "Horarios" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
+
+// Precio en pesos -> "$15.000"
+function precioAR(n: number): string {
+  return "$" + n.toLocaleString("es-AR");
+}
+
+function planLabel(p: Pick<GymPlan, "nombre" | "precio" | "dias_semana">): string {
+  return `${p.nombre} · ${precioAR(p.precio)}`;
+}
 
 export default function GimnasioPanel({ tenantId }: { tenantId: string }) {
   const [tab, setTab] = useState<Tab>("agenda");
@@ -68,7 +80,226 @@ export default function GimnasioPanel({ tenantId }: { tenantId: string }) {
 
       {tab === "agenda" && <Agenda />}
       {tab === "socios" && <Socios tenantId={tenantId} />}
+      {tab === "planes" && <Planes />}
       {tab === "horarios" && <Horarios tenantId={tenantId} />}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Planes (cuota por días/semana). El admin crea y edita precios; al cambiar un
+// precio, la API actualiza el débito automático de los socios ya adheridos.
+// ------------------------------------------------------------
+function Planes() {
+  const sb = createClient();
+  const [planes, setPlanes] = useState<GymPlan[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  const [nombre, setNombre] = useState("");
+  const [dias, setDias] = useState("");
+  const [precio, setPrecio] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  // Edición inline del precio por plan.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editPrecio, setEditPrecio] = useState("");
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      setPlanes(await getPlanes(sb));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cargar.");
+    } finally {
+      setCargando(false);
+    }
+  }, [sb]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  async function crear() {
+    setError(null);
+    setAviso(null);
+    if (!nombre.trim() || !precio.trim()) {
+      setError("Nombre y precio obligatorios.");
+      return;
+    }
+    setGuardando(true);
+    const res = await fetch("/api/gym/planes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre: nombre.trim(),
+        dias_semana: dias.trim() || null,
+        precio: precio.trim(),
+      }),
+    });
+    setGuardando(false);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "No se pudo crear el plan.");
+      return;
+    }
+    setNombre("");
+    setDias("");
+    setPrecio("");
+    cargar();
+  }
+
+  async function guardarPrecio(p: GymPlan) {
+    setError(null);
+    setAviso(null);
+    const res = await fetch("/api/gym/planes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: p.id, precio: editPrecio.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "No se pudo actualizar.");
+      return;
+    }
+    if (data.actualizados > 0 || data.fallidos > 0) {
+      setAviso(
+        `Débito automático: ${data.actualizados} actualizado(s)` +
+          (data.fallidos ? `, ${data.fallidos} con error` : "") +
+          ".",
+      );
+    }
+    setEditId(null);
+    cargar();
+  }
+
+  async function toggleActivo(p: GymPlan) {
+    setError(null);
+    const res = await fetch("/api/gym/planes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: p.id, activo: !p.activo }),
+    });
+    if (res.ok) cargar();
+  }
+
+  const input =
+    "rounded-lg border border-line bg-surface-2 px-3 py-2 text-[14px] text-ink outline-none focus:border-accent";
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2 rounded-panel border border-line bg-surface p-4 shadow-card">
+        <div className="text-[14px] font-bold">Nuevo plan</div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Nombre (ej. 3 días)"
+            className={`${input} min-w-0 flex-1`}
+          />
+          <input
+            value={dias}
+            onChange={(e) => setDias(e.target.value)}
+            placeholder="Días/sem"
+            inputMode="numeric"
+            className={`${input} w-24`}
+          />
+          <input
+            value={precio}
+            onChange={(e) => setPrecio(e.target.value)}
+            placeholder="Precio $"
+            inputMode="numeric"
+            className={`${input} w-28`}
+          />
+          <button
+            onClick={crear}
+            disabled={guardando}
+            className="rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+          >
+            {guardando ? "…" : "Agregar"}
+          </button>
+        </div>
+        <p className="text-[11px] text-faint">
+          Días/semana es opcional (dejalo vacío para “libre”).
+        </p>
+      </div>
+
+      {error && <p className="text-[13px] text-danger">{error}</p>}
+      {aviso && <p className="text-[13px] text-ok">{aviso}</p>}
+
+      {cargando ? (
+        <p className="py-8 text-center text-sm text-muted">Cargando…</p>
+      ) : planes.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted">
+          Todavía no hay planes. Creá el primero arriba.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {planes.map((p) => (
+            <div
+              key={p.id}
+              className={[
+                "rounded-card border bg-surface p-3 shadow-card",
+                p.activo ? "border-line" : "border-line opacity-60",
+              ].join(" ")}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[15px] font-bold">{p.nombre}</div>
+                  <div className="text-[12px] text-muted">
+                    {p.dias_semana ? `${p.dias_semana} días/semana` : "Libre"}
+                  </div>
+                </div>
+
+                {editId === p.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={editPrecio}
+                      onChange={(e) => setEditPrecio(e.target.value)}
+                      inputMode="numeric"
+                      className={`${input} w-28`}
+                    />
+                    <button
+                      onClick={() => guardarPrecio(p)}
+                      className="rounded-full bg-ink px-3 py-1.5 text-[12px] font-bold text-white"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      onClick={() => setEditId(null)}
+                      className="text-[12px] font-semibold text-muted"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <span className="text-[15px] font-bold text-accent">
+                      {precioAR(p.precio)}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setEditId(p.id);
+                        setEditPrecio(String(p.precio));
+                      }}
+                      className="text-[12px] font-semibold text-accent hover:brightness-90"
+                    >
+                      Editar precio
+                    </button>
+                    <button
+                      onClick={() => toggleActivo(p)}
+                      className="text-[12px] font-semibold text-muted hover:text-ink"
+                    >
+                      {p.activo ? "Desactivar" : "Activar"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -627,6 +858,7 @@ function fechaCorta(iso: string): string {
 function Socios({ tenantId }: { tenantId: string }) {
   const sb = createClient();
   const [socios, setSocios] = useState<GymSocio[]>([]);
+  const [planes, setPlanes] = useState<GymPlan[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -644,7 +876,9 @@ function Socios({ tenantId }: { tenantId: string }) {
     setCargando(true);
     setError(null);
     try {
-      setSocios(await getGymAlumnos(sb));
+      const [s, p] = await Promise.all([getGymAlumnos(sb), getPlanes(sb)]);
+      setSocios(s);
+      setPlanes(p);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar.");
     } finally {
@@ -655,6 +889,20 @@ function Socios({ tenantId }: { tenantId: string }) {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  async function cambiarPlan(socioId: string, planId: string) {
+    setError(null);
+    const res = await fetch("/api/gym/socio-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ socioId, planId: planId || null }),
+    });
+    if (res.ok) cargar();
+    else {
+      const d = await res.json().catch(() => ({}));
+      setError(d.error || "No se pudo cambiar el plan.");
+    }
+  }
 
   async function alta() {
     setError(null);
@@ -850,6 +1098,32 @@ function Socios({ tenantId }: { tenantId: string }) {
                           : "Sin pago"
                         : "No socio"}
                   </span>
+                </div>
+
+                {/* Plan (define el precio de la cuota / débito automático) */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-semibold text-muted">
+                    Plan
+                  </span>
+                  <select
+                    value={s.plan_id ?? ""}
+                    onChange={(e) => cambiarPlan(s.id, e.target.value)}
+                    className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-[12px] text-ink outline-none focus:border-accent"
+                  >
+                    <option value="">Sin plan</option>
+                    {planes
+                      .filter((p) => p.activo || p.id === s.plan_id)
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {planLabel(p)}
+                        </option>
+                      ))}
+                  </select>
+                  {s.plan && (
+                    <span className="text-[12px] text-muted">
+                      cuota {precioAR(s.plan.precio)}/mes
+                    </span>
+                  )}
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent, esGymStaff } from "@/lib/agent";
-import { crearPreapproval, mpConfigurado, mpCuotaMonto } from "@/lib/mercadopago";
+import { crearPreapproval, mpConfigurado } from "@/lib/mercadopago";
 
 // Genera el link de adhesión al débito automático de MercadoPago para un socio.
 // Lo dispara el admin (owner/gym_admin) desde el panel; el link se le pasa al
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   if (!mpConfigurado()) {
     return NextResponse.json(
-      { error: "MercadoPago todavía no está configurado (falta la cuenta y el monto)." },
+      { error: "MercadoPago todavía no está configurado (falta el access token)." },
       { status: 503 },
     );
   }
@@ -40,13 +40,22 @@ export async function POST(request: NextRequest) {
   if (!alumnoId) return NextResponse.json({ error: "Falta el socio" }, { status: 400 });
 
   // RLS del cliente de sesión scopea al tenant: si no aparece, no es del gym.
+  // El monto sale del precio del plan del socio.
   const { data: alumno } = await supabase
     .from("gym_alumnos")
-    .select("id, nombre, email")
+    .select("id, nombre, email, plan:gym_planes(nombre, precio)")
     .eq("id", alumnoId)
     .maybeSingle();
   if (!alumno) {
     return NextResponse.json({ error: "Socio no encontrado" }, { status: 404 });
+  }
+
+  const plan = alumno.plan as unknown as { nombre: string; precio: number } | null;
+  if (!plan || !plan.precio || plan.precio <= 0) {
+    return NextResponse.json(
+      { error: "Asignale primero un plan con precio al socio." },
+      { status: 400 },
+    );
   }
 
   const email = (body.email?.trim() || (alumno.email as string | null) || "").trim();
@@ -62,9 +71,9 @@ export async function POST(request: NextRequest) {
     const pre = await crearPreapproval({
       alumnoId,
       email,
-      montoARS: mpCuotaMonto(),
+      montoARS: plan.precio,
       backUrl: `${origin}/gimnasio/clases`,
-      reason: "Cuota mensual KINACTIVA",
+      reason: `Cuota mensual KINACTIVA — ${plan.nombre}`,
     });
 
     // Dejamos registrado el socio como MP + su suscripción (pendiente hasta que
