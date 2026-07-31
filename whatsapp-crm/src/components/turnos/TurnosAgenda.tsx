@@ -90,16 +90,12 @@ export default function TurnosAgenda({
                       <span>
                         {formatArHora(t.fecha_hora)} · {t.paciente?.nombre ?? "—"}
                       </span>
-                      {t.origen !== "manual" && (
+                      {t.origen === "web" && (
                         <span
-                          title={
-                            t.ia_notas_originales
-                              ? `Mensaje original: "${t.ia_notas_originales}"`
-                              : "Sugerido por IA"
-                          }
+                          title="Reserva hecha desde la web"
                           className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-accent"
                         >
-                          🤖 IA
+                          Web
                         </span>
                       )}
                     </div>

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { arLocalToUtc } from "@/lib/tz";
-import type { InterpretedTurno } from "@/lib/types";
 
 interface PacienteOption {
   id: string;
@@ -51,50 +50,6 @@ export default function TurnoForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [showIA, setShowIA] = useState(false);
-  const [textoIA, setTextoIA] = useState("");
-  const [interpretando, setInterpretando] = useState(false);
-  const [resultadoIA, setResultadoIA] = useState<InterpretedTurno | null>(null);
-  const [usoIA, setUsoIA] = useState(false);
-
-  async function interpretarConIA() {
-    if (!textoIA.trim()) return;
-    setInterpretando(true);
-    setResultadoIA(null);
-    try {
-      const res = await fetch("/api/ai/interpretar-turno", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto: textoIA }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "No se pudo interpretar el texto.");
-        return;
-      }
-      const interpretado = data.interpretado as InterpretedTurno;
-      setResultadoIA(interpretado);
-      setUsoIA(true);
-
-      if (interpretado.fecha) setFecha(interpretado.fecha);
-      if (interpretado.hora) setHora(interpretado.hora);
-      if (interpretado.duracion_min) setDuracion(interpretado.duracion_min);
-      if (interpretado.notas) setNotas(interpretado.notas);
-
-      if (interpretado.paciente_nombre) {
-        const nombreBuscado = interpretado.paciente_nombre.toLowerCase();
-        const matches = pacientes.filter((p) =>
-          p.nombre.toLowerCase().includes(nombreBuscado),
-        );
-        if (matches.length === 1) setPacienteId(matches[0].id);
-      }
-    } catch {
-      setError("No se pudo interpretar el texto.");
-    } finally {
-      setInterpretando(false);
-    }
-  }
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -114,7 +69,7 @@ export default function TurnoForm({
         fecha_hora: fechaHora,
         duracion_min: duracion,
         notas: notas.trim() || null,
-        origen: usoIA ? "ia_manual" : "manual",
+        origen: "manual",
       });
       if (error) throw error;
       router.refresh();
@@ -131,45 +86,6 @@ export default function TurnoForm({
       onSubmit={onSubmit}
       className="space-y-4 rounded-panel border border-line bg-surface p-5 shadow-card"
     >
-      <div className="rounded-xl border border-line bg-surface-2 p-3">
-        <button
-          type="button"
-          onClick={() => setShowIA((v) => !v)}
-          className="text-[13px] font-semibold text-accent"
-        >
-          ✨ Interpretar con IA
-        </button>
-        {showIA && (
-          <div className="mt-2 space-y-2">
-            <textarea
-              rows={2}
-              value={textoIA}
-              onChange={(e) => setTextoIA(e.target.value)}
-              placeholder="Ej: turno con Juan el jueves a las 15hs por dolor de rodilla"
-              className={inputClass}
-            />
-            <button
-              type="button"
-              onClick={interpretarConIA}
-              disabled={interpretando || !textoIA.trim()}
-              className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:bg-surface-2 disabled:opacity-60"
-            >
-              {interpretando ? "Interpretando…" : "Interpretar"}
-            </button>
-            {resultadoIA && !resultadoIA.es_pedido_turno && (
-              <p className="text-[13px] text-muted">
-                No parece un pedido de turno claro — revisá los campos a mano.
-              </p>
-            )}
-            {resultadoIA && resultadoIA.ambiguedades.length > 0 && (
-              <p className="text-[13px] text-warn">
-                {resultadoIA.ambiguedades.join(" · ")}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <label className="text-xs font-semibold text-muted">

@@ -19,20 +19,6 @@ export async function getTurnosProximos(
   return (data ?? []) as unknown as TurnoConPaciente[];
 }
 
-// Turnos sugeridos por IA (WhatsApp o texto libre) que todavía nadie revisó.
-export async function getTurnosPendientesIA(
-  sb: SupabaseClient,
-): Promise<TurnoConPaciente[]> {
-  const { data, error } = await sb
-    .from("turnos")
-    .select("*, paciente:pacientes(id, nombre, telefono)")
-    .eq("estado", "pendiente")
-    .neq("origen", "manual")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as unknown as TurnoConPaciente[];
-}
-
 // Turnos en un rango [desde, hasta) con paciente, servicio y profesional,
 // para la agenda del panel admin (vista día/semana). Ambos límites en ISO UTC.
 export async function getTurnosEnRango(

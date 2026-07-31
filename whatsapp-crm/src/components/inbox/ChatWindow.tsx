@@ -17,7 +17,6 @@ interface Props {
   sendError: string | null;
   onSend: (text: string) => Promise<boolean>;
   onBack?: () => void;
-  onToggleModoAtencion: () => void;
 }
 
 export default function ChatWindow({
@@ -29,7 +28,6 @@ export default function ChatWindow({
   sendError,
   onSend,
   onBack,
-  onToggleModoAtencion,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const channel = (contact.channel as Channel) ?? "whatsapp";
@@ -98,24 +96,6 @@ export default function ChatWindow({
             {contactSubtitle(contact) || CHANNEL_LABEL[channel]}
           </div>
         </div>
-        {channel === "whatsapp" && (
-          <button
-            onClick={onToggleModoAtencion}
-            className={[
-              "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors",
-              contact.modo_atencion === "ia"
-                ? "bg-accent-soft text-accent hover:bg-accent-soft/70"
-                : "bg-surface-2 text-muted hover:bg-surface-2/70",
-            ].join(" ")}
-            title={
-              contact.modo_atencion === "ia"
-                ? "La IA está respondiendo esta conversación. Click para pasar a modo manual."
-                : "Modo manual: la IA no responde acá. Click para reactivarla."
-            }
-          >
-            {contact.modo_atencion === "ia" ? "🤖 IA activa" : "Modo manual"}
-          </button>
-        )}
         <span
           className={[
             "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium",

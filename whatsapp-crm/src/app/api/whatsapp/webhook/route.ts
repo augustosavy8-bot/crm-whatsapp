@@ -3,8 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { verifyMetaSignature } from "@/lib/whatsapp/verifySignature";
 import { parseWebhook } from "@/lib/whatsapp/parseWebhook";
 import { ingestWebhook } from "@/lib/whatsapp/ingest";
-import { maybeCreateTurnoFromMensaje } from "@/lib/turnosIA";
-import { maybeAutoReply } from "@/lib/whatsappBot";
 
 // El webhook no debe cachearse y corre en Node (usa crypto + service-role).
 export const runtime = "nodejs";
@@ -58,7 +56,7 @@ export async function POST(request: NextRequest) {
       }
       const { data: tenant } = await sb
         .from("tenants")
-        .select("id, nombre, ia_autorespuesta_activa")
+        .select("id")
         .eq("whatsapp_phone_number_id", parsed.phoneNumberId)
         .maybeSingle();
       if (!tenant) {
@@ -75,45 +73,8 @@ export async function POST(request: NextRequest) {
         statusUpdates: summary.statusUpdates,
         skipped: summary.skipped,
       });
-      // Sin push por cada mensaje entrante (a propósito): solo se notifica
-      // cuando la IA deriva un turno para aprobar (turnosIA.ts) o cuando
-      // deriva la conversación a un humano (whatsappBot.ts).
-
-      // Interpretación de turnos con IA, aditiva: NUNCA debe afectar la
-      // respuesta 200 del webhook.
-      try {
-        for (const c of summary.turnoCandidatos) {
-          await maybeCreateTurnoFromMensaje(sb, {
-            tenantId: tenant.id as string,
-            contactId: c.contactId,
-            texto: c.texto,
-          });
-        }
-      } catch (e) {
-        console.error("[whatsapp] interpretación de turno falló (ignorado)", e);
-      }
-
-      // Auto-respuesta con IA, aditiva: NUNCA debe afectar la respuesta 200
-      // del webhook. Credenciales del tenant: hoy salen de env vars (tenant
-      // piloto, single-tenant), igual que /api/messages/send/route.ts.
-      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-      if (phoneNumberId && accessToken) {
-        try {
-          for (const c of summary.turnoCandidatos) {
-            await maybeAutoReply(sb, {
-              tenantId: tenant.id as string,
-              tenantIaActiva: tenant.ia_autorespuesta_activa as boolean,
-              tenantNombre: tenant.nombre as string | null,
-              contactId: c.contactId,
-              phoneNumberId,
-              accessToken,
-            });
-          }
-        } catch (e) {
-          console.error("[whatsapp] auto-respuesta IA falló (ignorado)", e);
-        }
-      }
+      // Recepción y persistencia de mensajes/estados, sin más. (La
+      // interpretación de turnos y la autorespuesta por IA se removieron.)
     }
   } catch (e) {
     // Nunca devolver !=2xx por un error interno: Meta reintenta y duplica.

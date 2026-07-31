@@ -6,7 +6,6 @@ import HeaderNav from "@/components/HeaderNav";
 import NotificationsProvider from "@/components/notifications/NotificationsProvider";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import PushButton from "@/components/notifications/PushButton";
-import AIAvatar from "@/components/AIAvatar";
 
 // Shell protegido: sin sesión no se entra (además del proxy, por las dudas).
 export default async function AppLayout({
@@ -38,16 +37,6 @@ export default async function AppLayout({
   // módulo inbox: si el tenant no lo tiene, no se monta. El webhook, el envío
   // y la publicación Realtime del backend siguen intactos: esto es solo UI.
   const mostrarChromeInbox = !esProfesional && modulos.inbox;
-
-  // El profesional no tiene inbox ni pendientes de IA (solo ve turnos suyos);
-  // el avatar/contador del CRM no aplica.
-  const { count: pendientesIA } = esProfesional
-    ? { count: 0 }
-    : await supabase
-        .from("turnos")
-        .select("id", { count: "exact", head: true })
-        .eq("estado", "pendiente")
-        .neq("origen", "manual");
 
   const contenido = (
     <div className="flex h-[100dvh] flex-col bg-canvas">
@@ -82,7 +71,6 @@ export default async function AppLayout({
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
-      {!esProfesional && <AIAvatar pendientesCount={pendientesIA ?? 0} />}
     </div>
   );
 

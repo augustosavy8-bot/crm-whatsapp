@@ -32,11 +32,6 @@ export default function MessageBubble({ message }: { message: Message }) {
             isOutbound ? "text-white/55" : "text-faint",
           ].join(" ")}
         >
-          {message.is_bot && (
-            <span title="Respondido por la IA" className="not-tabular-nums">
-              🤖
-            </span>
-          )}
           {formatTime(message.created_at)}
         </div>
       </div>

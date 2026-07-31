@@ -2,14 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent } from "@/lib/agent";
-import { getTurnosPendientesIA } from "@/lib/turnos";
 import { getPacientes } from "@/lib/pacientes";
 import {
   getProfesionales,
   getHorarios,
   getBloqueosFuturos,
 } from "@/lib/reservas";
-import TurnosPendientesIA from "@/components/turnos/TurnosPendientesIA";
 import TurnosVista from "@/components/turnos/TurnosVista";
 
 export default async function TurnosPage({
@@ -28,7 +26,6 @@ export default async function TurnosPage({
   // (RLS ya lo aisla, pero evitamos mostrar/ofrecer a los demás), y su servicio
   // para el título. Los owners ven la agenda completa como hasta ahora.
   const [
-    pendientesIA,
     pacientes,
     profesionales,
     { data: agentes },
@@ -36,9 +33,6 @@ export default async function TurnosPage({
     horarios,
     bloqueos,
   ] = await Promise.all([
-      esProfesional
-        ? Promise.resolve([])
-        : getTurnosPendientesIA(supabase),
       getPacientes(supabase),
       esProfesional
         ? Promise.resolve([{ id: agent.id, name: agent.name }])
@@ -83,8 +77,6 @@ export default async function TurnosPage({
             ⚙ Configuración
           </Link>
         </div>
-
-        {!esProfesional && <TurnosPendientesIA turnos={pendientesIA} />}
 
         <TurnosVista
           tenantId={agent.tenant_id}

@@ -10,7 +10,6 @@ export type MessageStatus =
   | "read"
   | "failed";
 
-export type ModoAtencion = "ia" | "humano";
 
 export interface Contact {
   id: string;
@@ -30,8 +29,6 @@ export interface Contact {
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
-  modo_atencion: ModoAtencion;
-  ia_respuestas_consecutivas: number;
 }
 
 export interface Message {
@@ -76,7 +73,6 @@ export interface Tenant {
   whatsapp_waba_id: string | null;
   messenger_page_id: string | null;
   instagram_business_id: string | null;
-  ia_autorespuesta_activa: boolean;
   created_at: string;
 }
 
@@ -141,8 +137,7 @@ export type TurnoEstado =
   | "atendido"
   | "ausente";
 
-export type TurnoOrigen = "manual" | "ia_whatsapp" | "ia_manual" | "web";
-export type IaConfianza = "alta" | "media" | "baja";
+export type TurnoOrigen = "manual" | "web";
 
 // --- Módulo de reservas del gimnasio (migración 0019) ---
 
@@ -204,21 +199,7 @@ export interface Turno {
   notas: string | null;
   recordatorio_enviado_at: string | null;
   origen: TurnoOrigen;
-  ia_confianza: IaConfianza | null;
-  ia_notas_originales: string | null;
   created_at: string;
-}
-
-// Salida estructurada de la interpretación de turnos con IA.
-export interface InterpretedTurno {
-  es_pedido_turno: boolean;
-  fecha: string | null; // YYYY-MM-DD
-  hora: string | null; // HH:MM (24h)
-  duracion_min: number | null;
-  notas: string | null;
-  paciente_nombre: string | null; // solo relevante en el flujo de texto libre
-  confianza: IaConfianza;
-  ambiguedades: string[];
 }
 
 // Turno + datos del paciente para listar sin joins manuales en la UI.

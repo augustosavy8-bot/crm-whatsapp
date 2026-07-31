@@ -115,14 +115,11 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Un agente escribiendo a mano siempre apaga el bot para este contacto:
-  // nunca deben convivir una respuesta humana y una automática.
   await supabase
     .from("contacts")
     .update({
       last_message_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      modo_atencion: "humano",
     })
     .eq("id", contact.id);
 
