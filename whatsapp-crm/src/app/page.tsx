@@ -5,11 +5,11 @@ import { getCurrentAlumno } from "@/lib/alumno";
 import { getModulosTenant } from "@/lib/modulos";
 
 // La raíz separa los mundos por rol:
-//   público (sin sesión) -> landing del gimnasio
-//   alumno               -> su panel (mis reservas / cuota)
-//   profesional          -> panel del gimnasio (staff)
-//   owner                -> dashboard de mensajes, o la agenda si el tenant
-//                           no tiene el módulo de inbox
+//   sin sesión   -> login (la página principal del sitio es el ingreso)
+//   alumno       -> su panel (mis reservas / cuota)
+//   profesional  -> panel del gimnasio (staff)
+//   owner        -> dashboard de mensajes, o la agenda si el tenant
+//                   no tiene el módulo de inbox
 export default async function Home() {
   const supabase = await createClient();
   const agent = await getCurrentAgent(supabase);
@@ -20,8 +20,10 @@ export default async function Home() {
     redirect(inbox ? "/dashboard" : "/turnos");
   }
 
-  // Sin agente: puede ser un alumno logueado o público sin sesión.
+  // Sin agente: puede ser un alumno logueado o alguien sin sesión.
   const alumno = await getCurrentAlumno(supabase);
   if (alumno) redirect("/mi-cuenta");
-  redirect("/gimnasio");
+  // Sin sesión: la página principal es el login (la landing pública sigue en
+  // /gimnasio para quien tenga el link directo).
+  redirect("/login");
 }
