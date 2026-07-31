@@ -101,7 +101,20 @@ function fechaLarga(iso: string): string {
   }).format(new Date(`${iso}T12:00:00Z`));
 }
 
-export default function ClasesFlow({ gimnasioNombre }: { gimnasioNombre: string }) {
+// Cuando el alumno está logueado, su nombre y WhatsApp salen de la sesión:
+// no se re-piden, y las reservas van por los endpoints /api/mi-cuenta/*.
+export interface SesionAlumno {
+  nombre: string;
+  telefono: string;
+}
+
+export default function ClasesFlow({
+  gimnasioNombre,
+  sesion,
+}: {
+  gimnasioNombre: string;
+  sesion?: SesionAlumno;
+}) {
   const [modo, setModo] = useState<"reservar" | "mis">("reservar");
 
   return (
@@ -126,7 +139,11 @@ export default function ClasesFlow({ gimnasioNombre }: { gimnasioNombre: string 
         ))}
       </div>
 
-      {modo === "reservar" ? <Reservar /> : <MisReservas />}
+      {modo === "reservar" ? (
+        <Reservar sesion={sesion} />
+      ) : (
+        <MisReservas sesion={sesion} />
+      )}
     </div>
   );
 }
@@ -134,7 +151,7 @@ export default function ClasesFlow({ gimnasioNombre }: { gimnasioNombre: string 
 // ------------------------------------------------------------
 // Reservar (suelta o fijo)
 // ------------------------------------------------------------
-function Reservar() {
+function Reservar({ sesion }: { sesion?: SesionAlumno }) {
   const dias = useMemo(construirDias, []);
   const [diaSel, setDiaSel] = useState<string | null>(null);
   const [horarios, setHorarios] = useState<HorarioDia[]>([]);
@@ -143,8 +160,8 @@ function Reservar() {
 
   const [sel, setSel] = useState<HorarioDia | null>(null);
   const [tipo, setTipo] = useState<"suelta" | "fijo">("suelta");
-  const [nombre, setNombre] = useState("");
-  const [telefono, setTelefono] = useState("");
+  const [nombre, setNombre] = useState(sesion?.nombre ?? "");
+  const [telefono, setTelefono] = useState(sesion?.telefono ?? "");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState<{ tipo: "suelta" | "fijo" } | null>(null);
@@ -172,23 +189,30 @@ function Reservar() {
     e.preventDefault();
     setError(null);
     if (!sel || !diaSel) return;
-    if (!nombre.trim() || !telefono.trim()) {
+    if (!sesion && (!nombre.trim() || !telefono.trim())) {
       setError("Necesitamos tu nombre y tu WhatsApp.");
       return;
     }
     setEnviando(true);
     try {
-      const res = await fetch("/api/gym/reservar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          horarioId: sel.horario_id,
-          fecha: diaSel,
-          tipo,
-          nombre: nombre.trim(),
-          telefono: telefono.trim(),
-        }),
-      });
+      const res = await fetch(
+        sesion ? "/api/mi-cuenta/reservar" : "/api/gym/reservar",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            sesion
+              ? { horarioId: sel.horario_id, fecha: diaSel, tipo }
+              : {
+                  horarioId: sel.horario_id,
+                  fecha: diaSel,
+                  tipo,
+                  nombre: nombre.trim(),
+                  telefono: telefono.trim(),
+                },
+          ),
+        },
+      );
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 409) {
@@ -212,8 +236,10 @@ function Reservar() {
   function reset() {
     setListo(null);
     setSel(null);
-    setNombre("");
-    setTelefono("");
+    if (!sesion) {
+      setNombre("");
+      setTelefono("");
+    }
     setTipo("suelta");
     setRefetch((n) => n + 1);
   }
@@ -297,33 +323,35 @@ function Reservar() {
           </button>
         </div>
 
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted">Nombre y apellido *</label>
-            <input
-              required
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Tu nombre"
-              className={inputClass}
-            />
+        {!sesion && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted">Nombre y apellido *</label>
+              <input
+                required
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Tu nombre"
+                className={inputClass}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted">WhatsApp *</label>
+              <input
+                required
+                type="tel"
+                inputMode="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                placeholder="Ej: 11 2345 6789"
+                className={inputClass}
+              />
+              <p className="text-[11px] text-faint">
+                Con este número gestionás tus reservas después.
+              </p>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted">WhatsApp *</label>
-            <input
-              required
-              type="tel"
-              inputMode="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              placeholder="Ej: 11 2345 6789"
-              className={inputClass}
-            />
-            <p className="text-[11px] text-faint">
-              Con este número gestionás tus reservas después.
-            </p>
-          </div>
-        </div>
+        )}
 
         {error && <p className="text-[13px] text-danger">{error}</p>}
 
@@ -434,24 +462,32 @@ function Reservar() {
 // ------------------------------------------------------------
 // Mis reservas (buscar por WhatsApp)
 // ------------------------------------------------------------
-function MisReservas() {
-  const [telefono, setTelefono] = useState("");
+function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
+  const [telefono, setTelefono] = useState(sesion?.telefono ?? "");
   const [buscado, setBuscado] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [reservas, setReservas] = useState<MiReserva[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [excepcionDe, setExcepcionDe] = useState<string | null>(null); // turno_fijo_id
 
+  // Logueado: cargamos sus reservas al entrar, sin pedir el número.
+  useEffect(() => {
+    if (sesion) buscar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function buscar(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!telefono.trim()) return;
+    if (!sesion && !telefono.trim()) return;
     setCargando(true);
     setError(null);
     setBuscado(true);
     setExcepcionDe(null);
     try {
       const res = await fetch(
-        `/api/gym/mis-reservas?telefono=${encodeURIComponent(telefono.trim())}`,
+        sesion
+          ? "/api/mi-cuenta/reservas"
+          : `/api/gym/mis-reservas?telefono=${encodeURIComponent(telefono.trim())}`,
       );
       const data = await res.json();
       if (!res.ok) {
@@ -470,10 +506,14 @@ function MisReservas() {
   async function cancelar(r: MiReserva) {
     const label = r.tipo === "fijo" ? "tu lugar fijo" : "esta reserva";
     if (!confirm(`¿Dar de baja ${label}?`)) return;
-    const res = await fetch("/api/gym/cancelar", {
+    const res = await fetch(sesion ? "/api/mi-cuenta/cancelar" : "/api/gym/cancelar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo: r.tipo, id: r.id, telefono: telefono.trim() }),
+      body: JSON.stringify(
+        sesion
+          ? { tipo: r.tipo, id: r.id }
+          : { tipo: r.tipo, id: r.id, telefono: telefono.trim() },
+      ),
     });
     if (res.ok) buscar();
     else {
@@ -499,28 +539,30 @@ function MisReservas() {
 
   return (
     <div className="space-y-5">
-      <form onSubmit={buscar} className="space-y-2">
-        <label className="text-xs font-semibold text-muted">
-          Tu WhatsApp
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="tel"
-            inputMode="tel"
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
-            placeholder="Ej: 11 2345 6789"
-            className={inputClass}
-          />
-          <button
-            type="submit"
-            disabled={cargando || !telefono.trim()}
-            className="shrink-0 rounded-xl bg-ink px-4 text-sm font-bold text-white hover:bg-ink/90 disabled:opacity-40"
-          >
-            Buscar
-          </button>
-        </div>
-      </form>
+      {!sesion && (
+        <form onSubmit={buscar} className="space-y-2">
+          <label className="text-xs font-semibold text-muted">
+            Tu WhatsApp
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              inputMode="tel"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="Ej: 11 2345 6789"
+              className={inputClass}
+            />
+            <button
+              type="submit"
+              disabled={cargando || !telefono.trim()}
+              className="shrink-0 rounded-xl bg-ink px-4 text-sm font-bold text-white hover:bg-ink/90 disabled:opacity-40"
+            >
+              Buscar
+            </button>
+          </div>
+        </form>
+      )}
 
       {error && <p className="text-[13px] text-danger">{error}</p>}
 
@@ -528,7 +570,9 @@ function MisReservas() {
 
       {buscado && !cargando && reservas.length === 0 && !error && (
         <p className="pt-4 text-center text-sm text-muted">
-          No encontramos reservas con ese número.
+          {sesion
+            ? "Todavía no tenés reservas. Reservá tu lugar en la pestaña “Reservar”."
+            : "No encontramos reservas con ese número."}
         </p>
       )}
 

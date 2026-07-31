@@ -58,7 +58,17 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const { data: claimsData } = await supabase.auth.getClaims();
     const appRole = claimsData?.claims?.app_role as string | undefined;
-    if (appRole === "profesional") {
+    if (appRole === "alumno") {
+      // El alumno solo tiene su panel. Cualquier otra ruta (el CRM, el gym
+      // admin, la raíz) lo devuelve a /mi-cuenta. RLS igual lo protege.
+      const enPanel = path === "/mi-cuenta" || path.startsWith("/mi-cuenta/");
+      if (!enPanel) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/mi-cuenta";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    } else if (appRole === "profesional") {
       const enTurnos = path === "/turnos" || path.startsWith("/turnos/");
       if (!enTurnos) {
         const url = request.nextUrl.clone();

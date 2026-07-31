@@ -1,0 +1,41 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export interface CurrentAlumno {
+  id: string;
+  tenant_id: string;
+  nombre: string;
+  telefono: string;
+  email: string | null;
+  es_socio: boolean;
+  cuota_hasta: string | null; // YYYY-MM-DD
+  metodo_pago: "efectivo" | "mercadopago";
+  mp_estado: string | null;
+}
+
+// Alumno logueado (su propia fila en `gym_alumnos`, vinculada por auth_user_id).
+// La policy `alumno_self_read` (0026) permite leer SOLO su fila con la sesión.
+// El teléfono que devuelve es la identidad canónica para los flujos de cupo
+// (mis-reservas, reservar, cancelar), así el panel no confía en el cliente.
+export async function getCurrentAlumno(
+  sb: SupabaseClient,
+): Promise<CurrentAlumno | null> {
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await sb
+    .from("gym_alumnos")
+    .select(
+      "id, tenant_id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, mp_estado",
+    )
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (!data || !data.tenant_id) return null;
+  return {
+    ...data,
+    es_socio: data.es_socio === true,
+    metodo_pago: data.metodo_pago === "mercadopago" ? "mercadopago" : "efectivo",
+  } as CurrentAlumno;
+}
