@@ -1,16 +1,16 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentAgent } from "@/lib/agent";
+import { getCurrentAgent, esGymStaff } from "@/lib/agent";
 import GimnasioPanel from "@/components/gimnasio/GimnasioPanel";
 
-// Panel del gimnasio (cupo grupal). Acceso: owner o gym_admin (Mariano). Un
-// profesional cualquiera no entra. RLS igual sella los datos por tenant/gate;
-// esto es la barrera de UI.
+// Panel del gimnasio (cupo grupal). Acceso: staff del gym (owner, profesional
+// o gym_admin). RLS igual sella los datos por tenant/gate; esto es la barrera
+// de UI.
 export default async function GymPanelPage() {
   const supabase = await createClient();
   const agent = await getCurrentAgent(supabase);
   if (!agent) redirect("/login");
-  if (agent.role !== "owner" && !agent.gym_admin) redirect("/turnos");
+  if (!esGymStaff(agent)) redirect("/turnos");
 
   return (
     <div className="h-full overflow-y-auto">

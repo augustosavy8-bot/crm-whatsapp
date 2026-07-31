@@ -17,8 +17,10 @@ const ITEMS_OWNER_SIN_INBOX = [
   { href: "/pacientes", label: "Pacientes" },
 ];
 
-// El profesional solo tiene su módulo de turnos.
+// El profesional es staff del gym: su panel es el gimnasio, y conserva su
+// agenda de turnos y la configuración.
 const ITEMS_PROFESIONAL = [
+  { href: "/gym", label: "Gimnasio" },
   { href: "/turnos", label: "Agenda" },
   { href: "/turnos/configuracion", label: "Configuración" },
 ];
@@ -39,10 +41,12 @@ export default function HeaderNav({
       : inboxEnabled
         ? ITEMS_OWNER
         : ITEMS_OWNER_SIN_INBOX;
-  // El panel de gimnasio (cupo grupal) lo ven el owner y quien tenga gym_admin
-  // (Mariano). Se suma al final de la nav que le corresponda por rol.
+  // El panel de gimnasio lo ve el staff del gym: owner, profesional o quien
+  // tenga gym_admin. Se suma al final si su nav base no lo trae ya.
+  const verGym = gymAdmin || role === "owner" || role === "profesional";
+  const yaTieneGym = base.some((it) => it.href === "/gym");
   const ITEMS =
-    gymAdmin || role === "owner"
+    verGym && !yaTieneGym
       ? [...base, { href: "/gym", label: "Gimnasio" }]
       : base;
   return (

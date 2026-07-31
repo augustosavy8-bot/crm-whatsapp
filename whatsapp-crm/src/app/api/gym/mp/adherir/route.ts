@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentAgent } from "@/lib/agent";
+import { getCurrentAgent, esGymStaff } from "@/lib/agent";
 import { crearPreapproval, mpConfigurado, mpCuotaMonto } from "@/lib/mercadopago";
 
 // Genera el link de adhesión al débito automático de MercadoPago para un socio.
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const agent = await getCurrentAgent(supabase);
   if (!agent) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  if (agent.role !== "owner" && !agent.gym_admin) {
+  if (!esGymStaff(agent)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 

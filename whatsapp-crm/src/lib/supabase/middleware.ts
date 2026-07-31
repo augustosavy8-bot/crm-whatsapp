@@ -69,10 +69,16 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
       }
     } else if (appRole === "profesional") {
-      const enTurnos = path === "/turnos" || path.startsWith("/turnos/");
-      if (!enTurnos) {
+      // El profesional es staff del gym: su panel es /gym, y mantiene su
+      // agenda /turnos. El resto del CRM no lo ve; cae en /gym.
+      const enStaffGym =
+        path === "/gym" ||
+        path.startsWith("/gym/") ||
+        path === "/turnos" ||
+        path.startsWith("/turnos/");
+      if (!enStaffGym) {
         const url = request.nextUrl.clone();
-        url.pathname = "/turnos";
+        url.pathname = "/gym";
         url.search = "";
         return NextResponse.redirect(url);
       }

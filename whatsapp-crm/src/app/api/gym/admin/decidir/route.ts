@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentAgent } from "@/lib/agent";
+import { getCurrentAgent, esGymStaff } from "@/lib/agent";
+import { createServiceClient } from "@/lib/supabase/service";
 import { sendText } from "@/lib/whatsapp/meta";
 import { normalizeArPhone } from "@/lib/phone";
 import { isWindowOpen } from "@/lib/window";
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const agent = await getCurrentAgent(supabase);
   if (!agent) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  if (agent.role !== "owner" && !agent.gym_admin) {
+  if (!esGymStaff(agent)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
@@ -97,10 +98,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // El aviso toca contacts/messages (CRM, sellado a owner). Como ahora también
+  // puede confirmar un profesional, la notificación del sistema va con el
+  // service client. La autorización ya ocurrió: el gate del handler + el update
+  // de la reserva de arriba (que pasó por RLS de staff del gym).
+  const svc = createServiceClient();
+
   // Buscar un contacto del CRM con ese número (formas con/sin el 9 argentino).
   const tel = alumno.telefono;
   const conNueve = tel.startsWith("54") ? "549" + tel.slice(2) : tel;
-  const { data: contactos } = await supabase
+  const { data: contactos } = await svc
     .from("contacts")
     .select("id, phone_number, last_inbound_at")
     .in("phone_number", Array.from(new Set([tel, conNueve])));
@@ -144,7 +151,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  await supabase.from("messages").insert({
+  await svc.from("messages").insert({
     tenant_id: agent.tenant_id,
     contact_id: contacto.id,
     channel: "whatsapp",
@@ -155,7 +162,7 @@ export async function POST(request: NextRequest) {
     status: "sent",
     is_bot: true,
   });
-  await supabase
+  await svc
     .from("contacts")
     .update({ last_message_at: new Date().toISOString() })
     .eq("id", contacto.id);

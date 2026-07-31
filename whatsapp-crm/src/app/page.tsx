@@ -7,14 +7,15 @@ import { getModulosTenant } from "@/lib/modulos";
 // La raíz separa los mundos por rol:
 //   público (sin sesión) -> landing del gimnasio
 //   alumno               -> su panel (mis reservas / cuota)
-//   profesional          -> su agenda
+//   profesional          -> panel del gimnasio (staff)
 //   owner                -> dashboard de mensajes, o la agenda si el tenant
 //                           no tiene el módulo de inbox
 export default async function Home() {
   const supabase = await createClient();
   const agent = await getCurrentAgent(supabase);
   if (agent) {
-    if (agent.role === "profesional") redirect("/turnos");
+    // Staff del gym que no es owner (profesional) aterriza en el panel de gym.
+    if (agent.role === "profesional") redirect("/gym");
     const { inbox } = await getModulosTenant(supabase);
     redirect(inbox ? "/dashboard" : "/turnos");
   }

@@ -29,7 +29,7 @@ export default async function AppLayout({
   const esGymAdmin = agente?.gym_admin === true;
 
   // Módulos del tenant: una sola lectura por request, se baja por props.
-  // El profesional tiene nav fijo (solo su agenda), no depende de esto.
+  // El profesional tiene nav fija (gimnasio + su agenda), no depende de esto.
   const modulos = esProfesional
     ? { inbox: false, turnos: true }
     : await getModulosTenant(supabase);

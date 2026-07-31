@@ -29,3 +29,13 @@ export async function getCurrentAgent(
   if (!data || !data.tenant_id) return null;
   return { ...data, gym_admin: data.gym_admin === true } as CurrentAgent;
 }
+
+// Staff del gimnasio: accede al panel de cupo completo (agenda, confirmar,
+// horarios, socios). En este negocio solo-gym los profes también son staff.
+// Espeja el gate SQL public.jwt_es_gym_staff() (migración 0027).
+export function esGymStaff(agent: CurrentAgent | null): boolean {
+  return (
+    !!agent &&
+    (agent.role === "owner" || agent.role === "profesional" || agent.gym_admin)
+  );
+}
