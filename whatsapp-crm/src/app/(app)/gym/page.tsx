@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent, esGymStaff } from "@/lib/agent";
 import GimnasioPanel from "@/components/gimnasio/GimnasioPanel";
+import PushButton from "@/components/notifications/PushButton";
 
 // Panel del gimnasio (cupo grupal). Acceso: staff del gym (owner, profesional
 // o gym_admin). RLS igual sella los datos por tenant/gate; esto es la barrera
@@ -15,11 +16,15 @@ export default async function GymPanelPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight">Gimnasio</h1>
-          <p className="text-sm text-muted">
-            Clases con cupo: quién va cada día y los horarios disponibles.
-          </p>
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Gimnasio</h1>
+            <p className="text-sm text-muted">
+              Clases con cupo: quién va cada día y los horarios disponibles.
+            </p>
+          </div>
+          {/* Push: avisa cuando un alumno se anota, para confirmar. */}
+          <PushButton />
         </header>
         <GimnasioPanel tenantId={agent.tenant_id} />
       </div>

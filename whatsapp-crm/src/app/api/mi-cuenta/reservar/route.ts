@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { anotarFijo, reservarSuelta } from "@/lib/gymCupo";
+import { notificarReservaGym } from "@/lib/gymNotif";
 
 // Alta de reserva del alumno LOGUEADO. Igual que /api/gym/reservar pero el
 // nombre y el teléfono salen de la sesión: no se re-piden ni se pueden falsear.
@@ -43,20 +44,29 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    let id: string;
     if (tipo === "suelta") {
-      const id = await reservarSuelta({
+      id = await reservarSuelta({
         horarioId,
         fecha,
         nombre: alumno.nombre,
         telefono: alumno.telefono,
       });
-      return NextResponse.json({ ok: true, tipo, id });
+    } else {
+      id = await anotarFijo({
+        horarioId,
+        fechaDesde: fecha,
+        nombre: alumno.nombre,
+        telefono: alumno.telefono,
+      });
     }
-    const id = await anotarFijo({
-      horarioId,
-      fechaDesde: fecha,
+    // Aviso al staff para que confirme (best-effort).
+    await notificarReservaGym({
+      tenantId: alumno.tenant_id,
       nombre: alumno.nombre,
-      telefono: alumno.telefono,
+      horarioId,
+      fecha,
+      tipo,
     });
     return NextResponse.json({ ok: true, tipo, id });
   } catch (e) {

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getGymContext } from "@/lib/gym";
 import { anotarFijo, reservarSuelta } from "@/lib/gymCupo";
+import { notificarReservaGym } from "@/lib/gymNotif";
 import { normalizeArPhone } from "@/lib/phone";
 
 // Alta de reserva de clase del gimnasio, sin cuenta. Dos modos que conviven:
@@ -62,11 +63,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    let id: string;
     if (tipo === "suelta") {
-      const id = await reservarSuelta({ horarioId, fecha, nombre, telefono });
-      return NextResponse.json({ ok: true, tipo, id });
+      id = await reservarSuelta({ horarioId, fecha, nombre, telefono });
+    } else {
+      id = await anotarFijo({ horarioId, fechaDesde: fecha, nombre, telefono });
     }
-    const id = await anotarFijo({ horarioId, fechaDesde: fecha, nombre, telefono });
+    // Aviso al staff para que confirme (best-effort).
+    await notificarReservaGym({ tenantId: gym.tenantId, nombre, horarioId, fecha, tipo });
     return NextResponse.json({ ok: true, tipo, id });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "No se pudo reservar.";
