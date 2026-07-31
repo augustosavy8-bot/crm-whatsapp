@@ -66,6 +66,24 @@ select {
   outline-offset: 2px;
 }
 
+/* Logo del login mientras entra a la app: se mece y "respira" (movimiento,
+   como la marca). El bloque de reduced-motion de abajo lo neutraliza. */
+@keyframes logo-entrando {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-6px) scale(1.04);
+    opacity: 0.8;
+  }
+}
+.logo-entrando {
+  animation: logo-entrando 0.9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;

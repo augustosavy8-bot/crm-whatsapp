@@ -42,7 +42,7 @@ export default function LoginPage() {
           <img
             src="/kinactiva-logo.png"
             alt="KINACTIVA — Centro Integral del Movimiento"
-            className="h-24 w-auto"
+            className={`h-24 w-auto${loading ? " logo-entrando" : ""}`}
           />
         </div>
 
