@@ -65,11 +65,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Crea la cuenta ya confirmada.
+  // es_alumno=true: el trigger handle_new_user lo ve y NO crea agent (los
+  // alumnos no son staff). Sin este flag quedaban duplicados con un agent
+  // fantasma. Ver migración 0034.
   const { data: created, error: authErr } = await sb.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { nombre: alumno.nombre },
+    user_metadata: { nombre: alumno.nombre, es_alumno: true },
   });
   if (authErr || !created?.user) {
     const dup = /already|registered|exists/i.test(authErr?.message ?? "");
