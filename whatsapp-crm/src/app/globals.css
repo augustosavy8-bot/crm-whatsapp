@@ -66,22 +66,39 @@ select {
   outline-offset: 2px;
 }
 
-/* Logo del login mientras entra a la app: se mece y "respira" (movimiento,
-   como la marca). El bloque de reduced-motion de abajo lo neutraliza. */
-@keyframes logo-entrando {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: translateY(-6px) scale(1.04);
-    opacity: 0.8;
-  }
+/* Login: al tocar Entrar, la tarjeta sale (nocOut), y el logo entra "en
+   carrera" con rastro (ghosts) y estelas de velocidad, mientras carga.
+   El bloque de reduced-motion de abajo neutraliza todo el movimiento. */
+@keyframes nocDash {
+  0%   { opacity: 0; transform: translate(-150px, 100px) scale(0.5) rotate(-6deg); }
+  45%  { opacity: 1; }
+  64%  { opacity: 1; transform: translate(14px, -10px) scale(1.06) rotate(1deg); }
+  100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
 }
-.logo-entrando {
-  animation: logo-entrando 0.9s ease-in-out infinite;
-  will-change: transform, opacity;
+@keyframes nocGhost {
+  0%   { opacity: 0; transform: translate(-150px, 100px) scale(0.5); }
+  35%  { opacity: 0.45; }
+  100% { opacity: 0; transform: translate(0, 0) scale(1); }
+}
+@keyframes nocStreak {
+  0%   { opacity: 0; transform: translateX(-70%) scaleX(0.12); }
+  35%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(150%) scaleX(1); }
+}
+@keyframes nocFill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes nocSwapA {
+  0%, 40%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes nocSwapB {
+  0%, 46%   { opacity: 0; }
+  58%, 100% { opacity: 1; }
+}
+@keyframes nocOut {
+  to { opacity: 0; transform: translateY(-10px) scale(0.97); filter: blur(5px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
