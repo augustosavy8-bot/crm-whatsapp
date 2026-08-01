@@ -12,6 +12,7 @@ import {
   getPlanes,
   setGymHorarioActivo,
   updateGymSocio,
+  type GymAlumnoEnClase,
   type GymHorario,
   type GymOcupacionHorario,
   type GymPlan,
@@ -409,8 +410,8 @@ function Agenda() {
     else cargar();
   }
 
-  // Confirmar/rechazar una reserva pendiente. Va por la ruta (dispara el
-  // WhatsApp al confirmar); devuelve un warning si no se pudo avisar.
+  // Confirmar/rechazar una reserva pendiente. Al confirmar, el alumno recibe un
+  // push (si lo activó). El aviso por WhatsApp es aparte y manual (botón Avisar).
   async function decidir(
     tipo: "suelta" | "fijo",
     id: string,
@@ -427,8 +428,29 @@ function Agenda() {
       setError(data.error || "No se pudo procesar.");
       return;
     }
-    if (data.warning) setError(data.warning);
     cargar();
+  }
+
+  // Aviso MANUAL por WhatsApp de que el turno quedó confirmado: abre WhatsApp
+  // con el mensaje listo para que el staff lo mande (útil para el que no tiene
+  // la app / no activó las notificaciones). No manda nada solo.
+  async function avisarConfirmado(a: GymAlumnoEnClase, h: GymOcupacionHorario) {
+    const { data } = await sb
+      .from("gym_alumnos")
+      .select("telefono")
+      .eq("id", a.alumno_id)
+      .maybeSingle();
+    const tel = normalizeArPhone((data?.telefono as string | null) ?? null);
+    if (!tel) {
+      setError("Ese alumno no tiene WhatsApp cargado.");
+      return;
+    }
+    const [, m, d] = fecha.split("-");
+    const franja = `${h.hora_inicio.slice(0, 5)} a ${h.hora_fin.slice(0, 5)} hs`;
+    const msg =
+      `¡Hola ${a.nombre.split(" ")[0]}! Tu turno en KINACTIVA quedó confirmado ` +
+      `para el ${d}/${m} de ${franja}. Te esperamos.`;
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   return (
@@ -588,21 +610,33 @@ function Agenda() {
                                 Rechazar
                               </button>
                             </>
-                          ) : a.tipo === "fijo" && a.turno_fijo_id ? (
-                            <button
-                              onClick={() => noVieneHoy(a.turno_fijo_id!)}
-                              className="text-[12px] font-semibold text-muted hover:text-danger"
-                            >
-                              No viene hoy
-                            </button>
-                          ) : a.reserva_id ? (
-                            <button
-                              onClick={() => quitarSuelta(a.reserva_id!)}
-                              className="text-[12px] font-semibold text-muted hover:text-danger"
-                            >
-                              Quitar
-                            </button>
-                          ) : null}
+                          ) : (
+                            <>
+                              {/* Aviso manual: abre WhatsApp con el mensaje listo. */}
+                              <button
+                                onClick={() => avisarConfirmado(a, h)}
+                                title="Avisar por WhatsApp que quedó confirmado"
+                                className="text-[12px] font-semibold text-ok hover:brightness-90"
+                              >
+                                Avisar
+                              </button>
+                              {a.tipo === "fijo" && a.turno_fijo_id ? (
+                                <button
+                                  onClick={() => noVieneHoy(a.turno_fijo_id!)}
+                                  className="text-[12px] font-semibold text-muted hover:text-danger"
+                                >
+                                  No viene hoy
+                                </button>
+                              ) : a.reserva_id ? (
+                                <button
+                                  onClick={() => quitarSuelta(a.reserva_id!)}
+                                  className="text-[12px] font-semibold text-muted hover:text-danger"
+                                >
+                                  Quitar
+                                </button>
+                              ) : null}
+                            </>
+                          )}
                         </div>
                       </li>
                     );

@@ -1,18 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent, esGymStaff } from "@/lib/agent";
-import { createServiceClient } from "@/lib/supabase/service";
-import { sendText } from "@/lib/whatsapp/meta";
-import { normalizeArPhone } from "@/lib/phone";
-import { isWindowOpen } from "@/lib/window";
 import { formatArFecha } from "@/lib/tz";
 import { sendPushToAlumno } from "@/lib/push/send";
 
-// Mariano confirma o rechaza una reserva del gimnasio. Al confirmar, intenta
-// avisar por WhatsApp (best-effort): el alumno del gym NO es un contacto del
-// CRM, así que solo se le puede mandar texto libre si además existe un contacto
-// con ese número y su ventana de 24hs sigue abierta. Si no, se confirma igual y
-// se avisa que no se pudo notificar. Requiere sesión owner/gym_admin.
+// Confirma o rechaza una reserva del gimnasio. Al confirmar, el único aviso
+// automático al alumno es un Web Push (si activó notificaciones). No se manda
+// nada por WhatsApp: para eso está el botón manual en el panel. Requiere sesión
+// de staff del gym (owner/profesional/gym_admin).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -74,31 +69,29 @@ export async function POST(request: NextRequest) {
   // Rechazo: no se notifica (el alumno lo ve en "Mis reservas"). Listo.
   if (accion === "rechazar") return NextResponse.json({ ok: true });
 
-  // --- Confirmar: aviso best-effort por WhatsApp ---
-  // El select es dinámico (tabla según tipo), así que Supabase no lo tipa: se
-  // castea la fila a la forma conocida vía unknown.
+  // --- Confirmar: Web Push al alumno ---
+  // No se manda nada por WhatsApp automático. El único aviso automático es el
+  // push (le llega con la app cerrada, si activó las notificaciones). Para el
+  // que no lo tiene, el staff avisa a mano con el botón de WhatsApp del panel.
+  // El select es dinámico (tabla según tipo): Supabase no lo tipa, se castea.
   const r = row as unknown as {
     alumno_id: string | null;
-    alumno: { nombre: string; telefono: string } | null;
     horario: { dia_semana: number; hora_inicio: string; hora_fin: string } | null;
     fecha?: string;
   };
-  const alumno = r.alumno;
   const horario = r.horario;
   const fecha = r.fecha;
 
-  // Web Push al alumno (best-effort): le llega aunque no tenga la app abierta
-  // ni WhatsApp vinculado. Independiente del aviso por WhatsApp de abajo.
   if (r.alumno_id && horario) {
-    const franjaPush = `${hhmm(horario.hora_inicio)} a ${hhmm(horario.hora_fin)} hs`;
+    const franja = `${hhmm(horario.hora_inicio)} a ${hhmm(horario.hora_fin)} hs`;
     const cuerpo =
       tipo === "suelta" && fecha
         ? `Tu clase del ${formatArFecha(`${fecha}T12:00:00Z`, {
             weekday: "long",
             day: "2-digit",
             month: "long",
-          })} de ${franjaPush} quedó confirmada.`
-        : `Quedaste anotado los ${DIAS[horario.dia_semana]} de ${franjaPush}.`;
+          })} de ${franja} quedó confirmada.`
+        : `Quedaste anotado los ${DIAS[horario.dia_semana]} de ${franja}.`;
     try {
       await sendPushToAlumno(r.alumno_id, {
         title: "¡Reserva confirmada! 🎉",
@@ -110,88 +103,6 @@ export async function POST(request: NextRequest) {
       console.error("[decidir] push al alumno falló", e);
     }
   }
-
-  if (!alumno?.telefono || !horario) {
-    return NextResponse.json({ ok: true });
-  }
-
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  if (!phoneNumberId || !accessToken) {
-    return NextResponse.json({
-      ok: true,
-      warning: "Confirmada. WhatsApp no está configurado, no se avisó.",
-    });
-  }
-
-  // El aviso toca contacts/messages (CRM, sellado a owner). Como ahora también
-  // puede confirmar un profesional, la notificación del sistema va con el
-  // service client. La autorización ya ocurrió: el gate del handler + el update
-  // de la reserva de arriba (que pasó por RLS de staff del gym).
-  const svc = createServiceClient();
-
-  // Buscar un contacto del CRM con ese número (formas con/sin el 9 argentino).
-  const tel = alumno.telefono;
-  const conNueve = tel.startsWith("54") ? "549" + tel.slice(2) : tel;
-  const { data: contactos } = await svc
-    .from("contacts")
-    .select("id, phone_number, last_inbound_at")
-    .in("phone_number", Array.from(new Set([tel, conNueve])));
-  const contacto = (contactos ?? []).find(
-    (c) => normalizeArPhone(c.phone_number as string | null) === tel,
-  );
-
-  if (!contacto) {
-    return NextResponse.json({
-      ok: true,
-      warning: "Confirmada. El alumno no tiene WhatsApp vinculado, no se le avisó.",
-    });
-  }
-  if (!isWindowOpen(contacto.last_inbound_at as string | null)) {
-    return NextResponse.json({
-      ok: true,
-      warning:
-        "Confirmada. Pasaron más de 24hs desde su último WhatsApp, no se le pudo avisar.",
-    });
-  }
-
-  const franja = `${hhmm(horario.hora_inicio)} a ${hhmm(horario.hora_fin)} hs`;
-  const mensaje =
-    tipo === "suelta" && fecha
-      ? `¡Tu reserva en KINACTIVA quedó confirmada para el ${formatArFecha(
-          `${fecha}T12:00:00Z`,
-          { weekday: "long", day: "2-digit", month: "long" },
-        )} de ${franja}! Te esperamos.`
-      : `¡Quedaste anotado en KINACTIVA los ${DIAS[horario.dia_semana]} de ${franja}! Te esperamos.`;
-
-  const envio = await sendText(
-    phoneNumberId,
-    accessToken,
-    normalizeArPhone(contacto.phone_number as string | null),
-    mensaje,
-  );
-  if (!envio.ok) {
-    return NextResponse.json({
-      ok: true,
-      warning: `Confirmada. Falló el aviso por WhatsApp: ${envio.error}`,
-    });
-  }
-
-  await svc.from("messages").insert({
-    tenant_id: agent.tenant_id,
-    contact_id: contacto.id,
-    channel: "whatsapp",
-    wa_message_id: envio.waMessageId,
-    direction: "outbound",
-    type: "text",
-    body: mensaje,
-    status: "sent",
-    is_bot: true,
-  });
-  await svc
-    .from("contacts")
-    .update({ last_message_at: new Date().toISOString() })
-    .eq("id", contacto.id);
 
   return NextResponse.json({ ok: true });
 }

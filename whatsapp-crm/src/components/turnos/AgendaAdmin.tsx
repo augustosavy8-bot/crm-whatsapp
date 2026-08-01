@@ -371,7 +371,8 @@ export default function AgendaAdmin({
     });
   }
 
-  // --- Cambio de estado (se mantiene el flujo de confirmar por WhatsApp) ---
+  // --- Cambio de estado. Confirmar solo cambia el estado (sin mensajes
+  // automáticos); el aviso al paciente es manual con el botón de WhatsApp. ---
   async function cambiarEstado(id: string, estado: TurnoEstado) {
     if (estado === "confirmado") {
       const r = await confirmarTurnoApi(id);
@@ -379,7 +380,6 @@ export default function AgendaAdmin({
         setToast({ tipo: "error", mensaje: r.error ?? "No se pudo confirmar." });
         return;
       }
-      if (r.warning) setToast({ tipo: "error", mensaje: r.warning });
       setDetalle(null);
       cargar();
       return;

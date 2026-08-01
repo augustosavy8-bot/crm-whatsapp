@@ -121,11 +121,7 @@ export default function ListaTurnos({
       () => setRecienConfirmado((id) => (id === t.id ? null : id)),
       1400,
     );
-    setToast(
-      r.warning
-        ? { tipo: "error", mensaje: r.warning }
-        : { tipo: "ok", mensaje: "Turno confirmado. Se avisó por WhatsApp." },
-    );
+    setToast({ tipo: "ok", mensaje: "Turno confirmado." });
   }
 
   async function marcar(t: TurnoConDetalle, estado: TurnoEstado) {

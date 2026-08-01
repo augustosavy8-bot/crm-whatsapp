@@ -2,16 +2,16 @@ import { normalizeArPhone } from "./phone";
 import { formatArFecha, formatArHora } from "./tz";
 
 // Acciones de turno compartidas por la lista operativa y la agenda. Client-side
-// (usan fetch/window). Reúsan el flujo existente: la confirmación pasa por
-// /api/turnos/confirmar (que además avisa por WhatsApp), no por un update suelto.
+// (usan fetch/window). La confirmación pasa por /api/turnos/confirmar (solo
+// cambia el estado, no manda nada); el aviso al paciente es manual con el botón
+// de WhatsApp de acá.
 
 export interface ConfirmarResult {
   ok: boolean;
-  warning?: string;
   error?: string;
 }
 
-// Confirma un turno vía la ruta que también dispara el WhatsApp al paciente.
+// Confirma un turno (cambia el estado). No manda ningún mensaje automático.
 export async function confirmarTurnoApi(
   turnoId: string,
 ): Promise<ConfirmarResult> {
@@ -24,7 +24,7 @@ export async function confirmarTurnoApi(
     const data = await res.json().catch(() => ({}));
     if (!res.ok)
       return { ok: false, error: data?.error || "No se pudo confirmar el turno." };
-    return { ok: true, warning: data?.warning };
+    return { ok: true };
   } catch {
     return { ok: false, error: "Error de red al confirmar." };
   }
