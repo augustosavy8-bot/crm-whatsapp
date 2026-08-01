@@ -40,13 +40,30 @@ export async function POST(request: NextRequest) {
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
+  // Si no es staff, puede ser un alumno del gym: guardamos su suscripción con
+  // alumno_id para poder avisarle (p. ej. cuando le confirman la reserva).
+  let alumnoId: string | null = null;
+  let tenantId: string | null = agent?.tenant_id ?? null;
+  if (!agent) {
+    const { data: alumno } = await supabase
+      .from("gym_alumnos")
+      .select("id, tenant_id")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    if (alumno) {
+      alumnoId = alumno.id as string;
+      tenantId = alumno.tenant_id as string;
+    }
+  }
+
   const admin = createServiceClient();
   const { error } = await admin
     .from("push_subscriptions")
     .upsert(
       {
         agent_id: agent?.id ?? null,
-        tenant_id: agent?.tenant_id ?? null,
+        alumno_id: alumnoId,
+        tenant_id: tenantId,
         endpoint,
         p256dh,
         auth,

@@ -6,6 +6,7 @@ import { sendText } from "@/lib/whatsapp/meta";
 import { normalizeArPhone } from "@/lib/phone";
 import { isWindowOpen } from "@/lib/window";
 import { formatArFecha } from "@/lib/tz";
+import { sendPushToAlumno } from "@/lib/push/send";
 
 // Mariano confirma o rechaza una reserva del gimnasio. Al confirmar, intenta
 // avisar por WhatsApp (best-effort): el alumno del gym NO es un contacto del
@@ -55,8 +56,8 @@ export async function POST(request: NextRequest) {
   // de sesión ya scopea al tenant: si no aparece, no es del gimnasio del admin.
   const sel =
     tipo === "suelta"
-      ? "id, fecha, alumno:gym_alumnos(nombre, telefono), horario:gym_horarios(dia_semana, hora_inicio, hora_fin)"
-      : "id, alumno:gym_alumnos(nombre, telefono), horario:gym_horarios(dia_semana, hora_inicio, hora_fin)";
+      ? "id, alumno_id, fecha, alumno:gym_alumnos(nombre, telefono), horario:gym_horarios(dia_semana, hora_inicio, hora_fin)"
+      : "id, alumno_id, alumno:gym_alumnos(nombre, telefono), horario:gym_horarios(dia_semana, hora_inicio, hora_fin)";
   const { data: row } = await supabase.from(tabla).select(sel).eq("id", id).maybeSingle();
   if (!row) {
     return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 });
@@ -77,6 +78,7 @@ export async function POST(request: NextRequest) {
   // El select es dinámico (tabla según tipo), así que Supabase no lo tipa: se
   // castea la fila a la forma conocida vía unknown.
   const r = row as unknown as {
+    alumno_id: string | null;
     alumno: { nombre: string; telefono: string } | null;
     horario: { dia_semana: number; hora_inicio: string; hora_fin: string } | null;
     fecha?: string;
@@ -84,6 +86,30 @@ export async function POST(request: NextRequest) {
   const alumno = r.alumno;
   const horario = r.horario;
   const fecha = r.fecha;
+
+  // Web Push al alumno (best-effort): le llega aunque no tenga la app abierta
+  // ni WhatsApp vinculado. Independiente del aviso por WhatsApp de abajo.
+  if (r.alumno_id && horario) {
+    const franjaPush = `${hhmm(horario.hora_inicio)} a ${hhmm(horario.hora_fin)} hs`;
+    const cuerpo =
+      tipo === "suelta" && fecha
+        ? `Tu clase del ${formatArFecha(`${fecha}T12:00:00Z`, {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+          })} de ${franjaPush} quedó confirmada.`
+        : `Quedaste anotado los ${DIAS[horario.dia_semana]} de ${franjaPush}.`;
+    try {
+      await sendPushToAlumno(r.alumno_id, {
+        title: "¡Reserva confirmada! 🎉",
+        body: cuerpo,
+        url: "/mi-cuenta",
+        tag: `reserva-${id}`,
+      });
+    } catch (e) {
+      console.error("[decidir] push al alumno falló", e);
+    }
+  }
 
   if (!alumno?.telefono || !horario) {
     return NextResponse.json({ ok: true });

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAlumno } from "@/lib/alumno";
 import SignOutButton from "@/components/SignOutButton";
+import PushButton from "@/components/notifications/PushButton";
 
 // Shell del alumno: sin sesión de alumno vinculada, a /login. El middleware ya
 // encierra a este rol en /mi-cuenta; este layout es la segunda barrera.
@@ -34,6 +35,8 @@ export default async function AlumnoLayout({
           <span className="hidden text-xs text-muted sm:block">
             {alumno.nombre}
           </span>
+          {/* Push: le avisa cuando el staff le confirma la reserva. */}
+          <PushButton />
           <SignOutButton />
         </div>
       </header>
