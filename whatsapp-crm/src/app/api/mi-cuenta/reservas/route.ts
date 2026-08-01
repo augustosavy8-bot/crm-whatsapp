@@ -3,9 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { getMisReservas } from "@/lib/gymCupo";
 
-// Reservas del alumno LOGUEADO. A diferencia de /api/gym/mis-reservas (público,
-// teléfono por query), acá el teléfono sale de la sesión: el alumno no puede
-// pedir las reservas de otro.
+// Reservas del alumno LOGUEADO: el teléfono (titularidad) sale de la sesión, no
+// de un query. Gestionar reservas exige cuenta (no hay más lookup por teléfono).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

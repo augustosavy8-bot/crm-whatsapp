@@ -463,7 +463,6 @@ function Reservar({ sesion }: { sesion?: SesionAlumno }) {
 // Mis reservas (buscar por WhatsApp)
 // ------------------------------------------------------------
 function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
-  const [telefono, setTelefono] = useState(sesion?.telefono ?? "");
   const [buscado, setBuscado] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [reservas, setReservas] = useState<MiReserva[]>([]);
@@ -471,25 +470,20 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [excepcionDe, setExcepcionDe] = useState<string | null>(null); // turno_fijo_id
 
-  // Logueado: cargamos sus reservas al entrar, sin pedir el número.
+  // Logueado: cargamos sus reservas al entrar. Sin sesión no se gestionan
+  // reservas (se pide ingresar) — el hook igual se declara siempre.
   useEffect(() => {
     if (sesion) buscar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function buscar(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!sesion && !telefono.trim()) return;
+  async function buscar() {
     setCargando(true);
     setError(null);
     setBuscado(true);
     setExcepcionDe(null);
     try {
-      const res = await fetch(
-        sesion
-          ? "/api/mi-cuenta/reservas"
-          : `/api/gym/mis-reservas?telefono=${encodeURIComponent(telefono.trim())}`,
-      );
+      const res = await fetch("/api/mi-cuenta/reservas");
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "No se pudo buscar.");
@@ -507,14 +501,10 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
   async function cancelar(r: MiReserva) {
     const label = r.tipo === "fijo" ? "tu lugar fijo" : "esta reserva";
     if (!confirm(`¿Dar de baja ${label}?`)) return;
-    const res = await fetch(sesion ? "/api/mi-cuenta/cancelar" : "/api/gym/cancelar", {
+    const res = await fetch("/api/mi-cuenta/cancelar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        sesion
-          ? { tipo: r.tipo, id: r.id }
-          : { tipo: r.tipo, id: r.id, telefono: telefono.trim() },
-      ),
+      body: JSON.stringify({ tipo: r.tipo, id: r.id }),
     });
     if (res.ok) buscar();
     else {
@@ -524,10 +514,10 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
   }
 
   async function avisarNoVoy(turnoFijoId: string, fecha: string) {
-    const res = await fetch("/api/gym/excepcion", {
+    const res = await fetch("/api/mi-cuenta/excepcion", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ turnoFijoId, fecha, telefono: telefono.trim() }),
+      body: JSON.stringify({ turnoFijoId, fecha }),
     });
     if (res.ok) {
       setExcepcionDe(null);
@@ -539,33 +529,29 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
     }
   }
 
+  // Sin cuenta no se gestionan reservas: se pide ingresar (evita que con solo
+  // un número cualquiera vea/cancele reservas ajenas).
+  if (!sesion) {
+    return (
+      <div className="space-y-3 rounded-panel border border-line bg-surface p-6 text-center shadow-card">
+        <p className="text-sm font-semibold text-ink">
+          Ingresá con tu cuenta para ver y cancelar tus reservas.
+        </p>
+        <p className="text-[13px] text-muted">
+          Si todavía no tenés cuenta, pedile el link de acceso al gimnasio.
+        </p>
+        <a
+          href="/login"
+          className="inline-block rounded-full bg-accent px-5 py-2 text-[13px] font-bold text-white hover:brightness-95"
+        >
+          Ingresar
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {!sesion && (
-        <form onSubmit={buscar} className="space-y-2">
-          <label className="text-xs font-semibold text-muted">
-            Tu WhatsApp
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="tel"
-              inputMode="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              placeholder="Ej: 11 2345 6789"
-              className={inputClass}
-            />
-            <button
-              type="submit"
-              disabled={cargando || !telefono.trim()}
-              className="shrink-0 rounded-xl bg-ink px-4 text-sm font-bold text-white hover:bg-ink/90 disabled:opacity-40"
-            >
-              Buscar
-            </button>
-          </div>
-        </form>
-      )}
-
       {error && <p className="text-[13px] text-danger">{error}</p>}
       {okMsg && <p className="text-[13px] text-ok">{okMsg}</p>}
 
@@ -573,9 +559,7 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
 
       {buscado && !cargando && reservas.length === 0 && !error && (
         <p className="pt-4 text-center text-sm text-muted">
-          {sesion
-            ? "Todavía no tenés reservas. Reservá tu lugar en la pestaña “Reservar”."
-            : "No encontramos reservas con ese número."}
+          Todavía no tenés reservas. Reservá tu lugar en la pestaña “Reservar”.
         </p>
       )}
 
