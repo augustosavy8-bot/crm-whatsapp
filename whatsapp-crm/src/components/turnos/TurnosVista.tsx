@@ -8,7 +8,7 @@ import type { ProfesionalHorario, ProfesionalBloqueo } from "@/lib/types";
 import type { ProfesionalConNombre } from "@/lib/reservas";
 
 type Tab = "lista" | "agenda";
-const TAB_KEY = "foko:turnos-tab";
+const TAB_KEY = "kinactiva:turnos-tab";
 
 interface PacienteOption {
   id: string;

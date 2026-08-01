@@ -1,6 +1,7 @@
 {
-  "name": "whatsapp-crm",
-  "version": "0.1.0",
+  "name": "kinactiva",
+  "version": "1.0.0",
+  "description": "KINACTIVA — reservas y gestión del gimnasio (turnos, clases con cupo, alumnos y cuotas).",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -468,6 +468,7 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
   const [cargando, setCargando] = useState(false);
   const [reservas, setReservas] = useState<MiReserva[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
   const [excepcionDe, setExcepcionDe] = useState<string | null>(null); // turno_fijo_id
 
   // Logueado: cargamos sus reservas al entrar, sin pedir el número.
@@ -530,7 +531,8 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
     });
     if (res.ok) {
       setExcepcionDe(null);
-      alert("Listo, avisamos que ese día no vas. Liberaste tu lugar.");
+      setError(null);
+      setOkMsg("Listo, avisamos que ese día no vas. Liberaste tu lugar.");
     } else {
       const d = await res.json().catch(() => ({}));
       setError(d.error || "No se pudo registrar.");
@@ -565,6 +567,7 @@ function MisReservas({ sesion }: { sesion?: SesionAlumno }) {
       )}
 
       {error && <p className="text-[13px] text-danger">{error}</p>}
+      {okMsg && <p className="text-[13px] text-ok">{okMsg}</p>}
 
       {cargando && <p className="text-center text-sm text-muted">Buscando…</p>}
 

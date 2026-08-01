@@ -14,7 +14,7 @@ import { contactLabel, messagePreview } from "@/lib/format";
 import type { Message } from "@/lib/types";
 
 const BASE_TITLE = "KINACTIVA";
-const MUTE_KEY = "foko_notif_muted";
+const MUTE_KEY = "kinactiva_notif_muted";
 
 type Permission = NotificationPermission | "unsupported";
 
@@ -146,10 +146,6 @@ export default function NotificationsProvider({
           const msg = payload.new as Message;
           if (msg.direction !== "inbound") return;
 
-          // Aviso visual (aditivo): el avatar flotante escucha este evento
-          // para reaccionar a mensajes nuevos, sin abrir otro canal Realtime.
-          window.dispatchEvent(new CustomEvent("foko:new-message"));
-
           if (!mutedRef.current) playBeep();
 
           const away = document.hidden || !document.hasFocus();
@@ -177,7 +173,7 @@ export default function NotificationsProvider({
             try {
               const n = new Notification(label, {
                 body,
-                tag: `foko-${msg.contact_id}`,
+                tag: `kinactiva-${msg.contact_id}`,
                 icon: "/favicon.ico",
               });
               n.onclick = () => {

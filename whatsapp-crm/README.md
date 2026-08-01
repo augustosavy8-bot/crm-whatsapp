@@ -1,66 +1,57 @@
-# WhatsApp CRM
+# KINACTIVA
 
-Inbox web (estilo WhatsApp Web) para gestionar las conversaciones de WhatsApp Business
-del negocio. Next.js (App Router) + Supabase + Tailwind + TypeScript.
+App de reservas y gestión para el gimnasio: turnos de los profesionales, clases
+grupales con cupo, alumnos y cuotas, todo en un panel. Next.js 16 (App Router) +
+Supabase + Tailwind v4 + TypeScript, deploy en Vercel.
 
-Vive como subproyecto dentro del repo FOKO, pero es una app **independiente** (su propio
-`package.json`, deploy y proyecto de Supabase).
-
-## Estado
-- **Fase 1 (actual)**: schema + webhook receptor. Un mensaje real de WhatsApp se guarda en la base.
-- Fase 2: Inbox (lectura) + Realtime + auth. · Fase 3: envío. · Fase 4: contactos/tags/estados. ·
-  Fase 5: multi-agente + templates.
+## Qué incluye
+- **Turnos** de los profesionales (agenda, reserva pública, confirmación, drag&drop).
+- **Clases del gimnasio** con cupo (reserva suelta o fija, cupo por horario).
+- **Alumnos**: alta, invitación por link, panel propio (`/mi-cuenta`), estado de cuota.
+- **Cuotas / planes**: precios por plan, MercadoPago (débito automático) opcional.
+- **Notificaciones**: Web Push al staff (reserva nueva) y al alumno (reserva
+  confirmada), realtime en el panel. Los avisos por WhatsApp son manuales.
+- **Multi-tenant** con RLS: cada dato queda sellado por `tenant_id` + rol vía los
+  claims del JWT.
 
 ## Setup
 
-### 1. Proyecto Supabase (nuevo/dedicado)
-1. Crear un proyecto en [supabase.com](https://supabase.com).
-2. En **SQL Editor**, pegar y correr en orden:
-   - `supabase/migrations/0001_init.sql`
-   - `supabase/migrations/0002_realtime.sql`
-   - `supabase/migrations/0003_auth_trigger.sql`
+### 1. Supabase
+Crear un proyecto en [supabase.com](https://supabase.com) y correr las migraciones
+de `supabase/migrations/` **en orden** (SQL Editor, o `supabase db push`).
+
+Pasos manuales que no van en las migraciones:
+- **Auth → Hooks → Access Token**: apuntar a `custom_access_token_hook` (emite los
+  claims `tenant_id`, `app_role`, `agent_id`).
+- **Auth → URL Configuration**: agregar `https://<dominio>/reset` a las *Redirect
+  URLs* (recuperación de contraseña) y setear el *Site URL* con el dominio.
 
 ### 2. Variables de entorno
 ```bash
 cp .env.local.example .env.local
 ```
-Completar (ver comentarios en el archivo):
-- Supabase URL + anon key + **service_role** key.
-- `WHATSAPP_VERIFY_TOKEN` (lo inventás vos), `WHATSAPP_ACCESS_TOKEN` (token permanente
-  de System User), `META_APP_SECRET`.
-- `WHATSAPP_PHONE_NUMBER_ID` y `WHATSAPP_WABA_ID` ya vienen con los valores actuales.
+- **Supabase**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`.
+- **Web Push (VAPID)**: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `VAPID_SUBJECT`.
+- **MercadoPago** (opcional, para cuotas con débito automático): `MP_ACCESS_TOKEN`,
+  `MP_WEBHOOK_SECRET`.
+- **WhatsApp** (opcional, para el inbox manual): `WHATSAPP_PHONE_NUMBER_ID`,
+  `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET`.
 
-### 3. Correr en local
+### 3. Local
 ```bash
 npm install
 npm run dev
 ```
 
-## Deploy (Vercel) + webhook de Meta
-1. Deploy del subdirectorio `whatsapp-crm/` a Vercel. Cargar las mismas env vars en
-   **Project Settings → Environment Variables**.
-2. En **Meta → App → WhatsApp → Configuration**:
-   - **Callback URL**: `https://<tu-app>.vercel.app/api/whatsapp/webhook`
-   - **Verify token**: el mismo valor de `WHATSAPP_VERIFY_TOKEN`.
-   - Al guardar, Meta hace un GET de verificación (challenge).
-   - Suscribir el campo **`messages`**.
-
-## Probar la Fase 1
-Mandá un WhatsApp real al número del negocio → en Supabase (**Table Editor**) deberías ver:
-- una fila nueva en `contacts` (creada por número), y
-- una fila en `messages` con `direction = inbound` y el `body`.
-
-Los estados de mensajes salientes (sent/delivered/read/failed) actualizan la columna
-`status` del mensaje por `wa_message_id`.
+## Deploy
+Deploy del subdirectorio `whatsapp-crm/` a Vercel y cargar las mismas env vars en
+**Project Settings → Environment Variables**. El webhook de MercadoPago vive en
+`/api/gym/mp/webhook`; exige la firma (`MP_WEBHOOK_SECRET`) — sin ese secreto,
+rechaza los eventos.
 
 ## Notas
 - Todos los secrets viven en env vars, nunca en el código.
-- El webhook valida la firma `X-Hub-Signature-256` con `META_APP_SECRET`. Si el secret no
-  está seteado, la validación se omite con un warning (útil en pruebas tempranas; en
-  producción cargalo).
-- El webhook escribe con la **service-role key** (saltea RLS); el resto de la app usará la
-  anon key con RLS por sesión.
-- Next 16 renombró el archivo `middleware` a `proxy` (`src/proxy.ts`).
-
-> ⚠️ El `WHATSAPP_ACCESS_TOKEN` temporal de Meta expira en 24hs. Para uso sostenido generá
-> un token permanente de **System User**.
+- La seguridad real es RLS por sesión; la barrera de UI (proxy/rutas) es adicional.
+- Next 16 renombró `middleware` a `proxy` (`src/proxy.ts`).

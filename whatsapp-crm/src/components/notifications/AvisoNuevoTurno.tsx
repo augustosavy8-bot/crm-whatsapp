@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 // Escucha los INSERT de gym_reservas_sueltas / gym_turnos_fijos por Realtime
 // (publicación agregada en 0033). "Confirmar" pega a /api/gym/admin/decidir.
 
-const MUTE_KEY = "foko_notif_muted";
+const MUTE_KEY = "kinactiva_notif_muted";
 const DIAS = [
   "domingo",
   "lunes",

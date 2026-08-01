@@ -15,10 +15,12 @@ export default function PrivacyPage() {
       <article className="mx-auto max-w-2xl">
         <header className="mb-8 border-b border-line pb-6">
           <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
-              F
-            </div>
-            <span className="text-sm font-semibold">KINACTIVA</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/kinactiva-mark.png" alt="" aria-hidden className="h-7 w-auto" />
+            <span className="text-sm font-semibold">
+              <span className="text-brand">KIN</span>
+              <span className="text-accent">ACTIVA</span>
+            </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             Política de Privacidad

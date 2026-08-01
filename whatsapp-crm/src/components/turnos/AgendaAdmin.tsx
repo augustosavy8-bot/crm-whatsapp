@@ -52,7 +52,7 @@ const SLOT_MIN = 30; // paso de la grilla (snap): media hora
 const SLOT_PX = 48; // alto de cada slot de 30' en px
 const DEFAULT_START_H = 8;
 const DEFAULT_END_H = 20;
-const MOSTRAR_CANCELADOS_KEY = "foko:agenda-mostrar-cancelados";
+const MOSTRAR_CANCELADOS_KEY = "kinactiva:agenda-mostrar-cancelados";
 
 // --- Helpers de fecha ---
 function lunesDe(iso: string): string {
