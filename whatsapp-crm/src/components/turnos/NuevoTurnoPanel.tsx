@@ -3,11 +3,6 @@
 import { useState } from "react";
 import TurnoForm from "./TurnoForm";
 
-interface PacienteOption {
-  id: string;
-  nombre: string;
-}
-
 interface AgenteOption {
   id: string;
   name: string | null;
@@ -16,7 +11,6 @@ interface AgenteOption {
 
 interface Props {
   tenantId: string;
-  pacientes: PacienteOption[];
   agentes: AgenteOption[];
   defaultProfesionalId: string;
   defaultPacienteId?: string;
@@ -26,7 +20,6 @@ interface Props {
 // de "Nuevo turno" en el detalle de un paciente (?paciente=<id>).
 export default function NuevoTurnoPanel({
   tenantId,
-  pacientes,
   agentes,
   defaultProfesionalId,
   defaultPacienteId,
@@ -47,7 +40,6 @@ export default function NuevoTurnoPanel({
   return (
     <TurnoForm
       tenantId={tenantId}
-      pacientes={pacientes}
       agentes={agentes}
       defaultProfesionalId={defaultProfesionalId}
       defaultPacienteId={defaultPacienteId}

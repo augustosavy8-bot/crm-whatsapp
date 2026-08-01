@@ -1,19 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { arLocalToUtc, diaSemanaISO } from "@/lib/tz";
+import PacientePicker from "@/components/pacientes/PacientePicker";
 
 // "HH:MM[:SS]" -> minutos desde medianoche.
 function horaAMin(t: string): number {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
-}
-
-interface PacienteOption {
-  id: string;
-  nombre: string;
 }
 
 interface AgenteOption {
@@ -24,7 +20,6 @@ interface AgenteOption {
 
 interface Props {
   tenantId: string;
-  pacientes: PacienteOption[];
   agentes: AgenteOption[];
   defaultProfesionalId: string;
   defaultPacienteId?: string;
@@ -37,7 +32,6 @@ const inputClass =
 
 export default function TurnoForm({
   tenantId,
-  pacientes,
   agentes,
   defaultProfesionalId,
   defaultPacienteId,
@@ -45,7 +39,7 @@ export default function TurnoForm({
   onCancel,
 }: Props) {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [pacienteId, setPacienteId] = useState(defaultPacienteId ?? "");
   const [profesionalId, setProfesionalId] = useState(defaultProfesionalId);
@@ -173,19 +167,10 @@ export default function TurnoForm({
           <label className="text-xs font-semibold text-muted">
             Paciente *
           </label>
-          <select
-            required
-            value={pacienteId}
-            onChange={(e) => setPacienteId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Seleccionar…</option>
-            {pacientes.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
+          <PacientePicker
+            defaultPacienteId={defaultPacienteId}
+            onSelect={setPacienteId}
+          />
         </div>
 
         <div className="space-y-1.5">

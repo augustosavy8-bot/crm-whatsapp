@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent } from "@/lib/agent";
-import { getPacientes } from "@/lib/pacientes";
 import {
   getProfesionales,
   getHorarios,
@@ -26,14 +25,12 @@ export default async function TurnosPage({
   // (RLS ya lo aisla, pero evitamos mostrar/ofrecer a los demás), y su servicio
   // para el título. Los owners ven la agenda completa como hasta ahora.
   const [
-    pacientes,
     profesionales,
     { data: agentes },
     servicioProp,
     horarios,
     bloqueos,
   ] = await Promise.all([
-      getPacientes(supabase),
       esProfesional
         ? Promise.resolve([{ id: agent.id, name: agent.name }])
         : getProfesionales(supabase),
@@ -81,7 +78,6 @@ export default async function TurnosPage({
         <TurnosVista
           tenantId={agent.tenant_id}
           esOwner={!esProfesional}
-          pacientes={pacientes.map((p) => ({ id: p.id, nombre: p.nombre }))}
           agentes={agentes ?? []}
           profesionales={profesionales}
           defaultProfesionalId={agent.id}

@@ -10,6 +10,35 @@ export async function getPacientes(sb: SupabaseClient): Promise<Paciente[]> {
   return (data ?? []) as Paciente[];
 }
 
+// Opción mínima para el buscador de pacientes (id + nombre).
+export interface PacienteOpcion {
+  id: string;
+  nombre: string;
+}
+
+// Busca pacientes por nombre (o teléfono), acotado. Reemplaza traer el padrón
+// entero en el selector de "Nuevo turno": a miles de pacientes, ese <select>
+// era inusable. RLS ya scopea al tenant.
+export async function buscarPacientes(
+  sb: SupabaseClient,
+  q: string,
+  limit = 20,
+): Promise<PacienteOpcion[]> {
+  const term = q.trim();
+  let query = sb
+    .from("pacientes")
+    .select("id, nombre")
+    .order("nombre", { ascending: true })
+    .limit(limit);
+  if (term) {
+    // Nombre o teléfono contienen el término.
+    query = query.or(`nombre.ilike.%${term}%,telefono.ilike.%${term}%`);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as PacienteOpcion[];
+}
+
 export async function getPaciente(
   sb: SupabaseClient,
   id: string,

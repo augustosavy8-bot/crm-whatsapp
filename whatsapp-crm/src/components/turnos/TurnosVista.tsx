@@ -10,10 +10,6 @@ import type { ProfesionalConNombre } from "@/lib/reservas";
 type Tab = "lista" | "agenda";
 const TAB_KEY = "kinactiva:turnos-tab";
 
-interface PacienteOption {
-  id: string;
-  nombre: string;
-}
 interface AgenteOption {
   id: string;
   name: string | null;
@@ -27,7 +23,6 @@ interface AgenteOption {
 export default function TurnosVista({
   tenantId,
   esOwner,
-  pacientes,
   agentes,
   profesionales,
   defaultProfesionalId,
@@ -37,7 +32,6 @@ export default function TurnosVista({
 }: {
   tenantId: string;
   esOwner: boolean;
-  pacientes: PacienteOption[];
   agentes: AgenteOption[];
   profesionales: ProfesionalConNombre[];
   defaultProfesionalId: string;
@@ -106,7 +100,6 @@ export default function TurnosVista({
       {/* "+ Turno": mismo componente para las dos tabs */}
       <NuevoTurnoPanel
         tenantId={tenantId}
-        pacientes={pacientes}
         agentes={agentes}
         defaultProfesionalId={defaultProfesionalId}
         defaultPacienteId={defaultPacienteId}
