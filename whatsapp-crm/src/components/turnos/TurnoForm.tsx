@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { arLocalToUtc } from "@/lib/tz";
+import { arLocalToUtc, diaSemanaISO } from "@/lib/tz";
+
+// "HH:MM[:SS]" -> minutos desde medianoche.
+function horaAMin(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
 
 interface PacienteOption {
   id: string;
@@ -49,19 +55,82 @@ export default function TurnoForm({
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Aviso blando: el turno cae fuera del horario habitual o sobre un bloqueo.
+  // No bloquea (el staff a veces agenda excepciones), pero exige un 2º click.
+  const [aviso, setAviso] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Limpia el aviso al editar cualquier campo que lo afecte: obliga a re-chequear.
+  function reset<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      setAviso(null);
+      setter(v);
+    };
+  }
+
+  // Chequeo blando contra la agenda del profesional (horarios + bloqueos).
+  // Devuelve un texto de aviso o null si el turno cae dentro de su horario.
+  async function chequearHorario(fechaHoraUtc: string): Promise<string | null> {
+    if (!profesionalId) return null;
+    const finUtc = new Date(
+      new Date(fechaHoraUtc).getTime() + duracion * 60_000,
+    ).toISOString();
+
+    const { data: bloqueos } = await supabase
+      .from("profesional_bloqueos")
+      .select("desde, hasta")
+      .eq("profesional_id", profesionalId)
+      .lt("desde", finUtc)
+      .gt("hasta", fechaHoraUtc);
+    if (bloqueos && bloqueos.length > 0) {
+      return "Ese horario cae sobre un bloqueo de la agenda del profesional.";
+    }
+
+    const { data: franjas } = await supabase
+      .from("profesional_horarios")
+      .select("hora_inicio, hora_fin")
+      .eq("profesional_id", profesionalId)
+      .eq("dia_semana", diaSemanaISO(fecha))
+      .eq("activo", true);
+    const inicioMin = horaAMin(hora);
+    const finMin = inicioMin + duracion;
+    const dentro = (franjas ?? []).some(
+      (f) =>
+        inicioMin >= horaAMin(f.hora_inicio as string) &&
+        finMin <= horaAMin(f.hora_fin as string),
+    );
+    if (!dentro) {
+      return "Queda fuera del horario de atención habitual del profesional.";
+    }
+    return null;
+  }
+
+  async function crearTurno(forzar: boolean) {
     setError(null);
     if (!pacienteId || !fecha || !hora) {
       setError("Faltan datos: paciente, fecha y hora son obligatorios.");
       return;
     }
+    if (!Number.isFinite(duracion) || duracion <= 0) {
+      setError("La duración debe ser mayor a 0.");
+      return;
+    }
+    // El staff carga hora de Buenos Aires. Explícito, no depende de la zona
+    // del browser (si no, en un server UTC quedaba corrido 3hs).
+    const fechaHora = arLocalToUtc(fecha, hora);
+    if (new Date(fechaHora).getTime() < Date.now()) {
+      setError("No se puede crear un turno en una fecha/hora que ya pasó.");
+      return;
+    }
+
     setSaving(true);
     try {
-      // El staff carga hora de Buenos Aires. Esto daba bien solo porque el
-      // device está en AR; explícito, no depende de la zona del browser.
-      const fechaHora = arLocalToUtc(fecha, hora);
+      if (!forzar) {
+        const av = await chequearHorario(fechaHora);
+        if (av) {
+          setAviso(av);
+          return; // no inserta: el usuario decide con "Crear igual"
+        }
+      }
       const { error } = await supabase.from("turnos").insert({
         tenant_id: tenantId,
         paciente_id: pacienteId,
@@ -71,7 +140,15 @@ export default function TurnoForm({
         notas: notas.trim() || null,
         origen: "manual",
       });
-      if (error) throw error;
+      if (error) {
+        // 23P01 = exclusion_violation del EXCLUDE turnos_sin_solape.
+        setError(
+          error.code === "23P01"
+            ? "Ese profesional ya tiene un turno que se superpone con ese horario. Elegí otro."
+            : error.message || "No se pudo crear el turno.",
+        );
+        return;
+      }
       router.refresh();
       onSaved();
     } catch (err) {
@@ -79,6 +156,11 @@ export default function TurnoForm({
     } finally {
       setSaving(false);
     }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    crearTurno(false);
   }
 
   return (
@@ -112,7 +194,7 @@ export default function TurnoForm({
             type="date"
             required
             value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
+            onChange={(e) => reset(setFecha)(e.target.value)}
             className={inputClass}
           />
         </div>
@@ -122,7 +204,7 @@ export default function TurnoForm({
             type="time"
             required
             value={hora}
-            onChange={(e) => setHora(e.target.value)}
+            onChange={(e) => reset(setHora)(e.target.value)}
             className={inputClass}
           />
         </div>
@@ -136,7 +218,7 @@ export default function TurnoForm({
             min={5}
             step={5}
             value={duracion}
-            onChange={(e) => setDuracion(Number(e.target.value))}
+            onChange={(e) => reset(setDuracion)(Number(e.target.value))}
             className={inputClass}
           />
         </div>
@@ -148,7 +230,7 @@ export default function TurnoForm({
             </label>
             <select
               value={profesionalId}
-              onChange={(e) => setProfesionalId(e.target.value)}
+              onChange={(e) => reset(setProfesionalId)(e.target.value)}
               className={inputClass}
             >
               {agentes.map((a) => (
@@ -173,14 +255,31 @@ export default function TurnoForm({
 
       {error && <p className="text-[13px] text-danger">{error}</p>}
 
+      {aviso && !error && (
+        <p className="rounded-xl border border-warn/40 bg-warn/10 px-3.5 py-2.5 text-[13px] text-warn">
+          ⚠ {aviso} Revisá el horario, o crealo igual si es una excepción.
+        </p>
+      )}
+
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:opacity-60"
-        >
-          {saving ? "Guardando…" : "Crear turno"}
-        </button>
+        {aviso ? (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => crearTurno(true)}
+            className="rounded-full bg-warn px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-warn/90 disabled:opacity-60"
+          >
+            {saving ? "Guardando…" : "Crear igual"}
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:opacity-60"
+          >
+            {saving ? "Guardando…" : "Crear turno"}
+          </button>
+        )}
         <button
           type="button"
           onClick={onCancel}
