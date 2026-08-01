@@ -66,23 +66,3 @@ export function sendText(
     text: { preview_url: false, body },
   });
 }
-
-// Template aprobado con variables por componente (para reabrir fuera de la ventana).
-export function sendTemplate(
-  phoneNumberId: string,
-  accessToken: string,
-  to: string,
-  name: string,
-  language: string,
-  components?: unknown[],
-): Promise<SendResult> {
-  return postMessage(phoneNumberId, accessToken, {
-    to,
-    type: "template",
-    template: {
-      name,
-      language: { code: language },
-      ...(components && components.length ? { components } : {}),
-    },
-  });
-}

@@ -1,23 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { arLocalToUtc, hoyISOArgentina } from "./tz";
-import type { TurnoConPaciente, TurnoConDetalle, Turno } from "./types";
-
-// Próximos turnos (desde hoy 00:00 de Buenos Aires) con datos mínimos del
-// paciente, para la agenda. Ojo: `setHours(0,0,0,0)` sería medianoche del
-// runtime — en Vercel (UTC) arrancaba a las 21hs del día anterior en AR.
-export async function getTurnosProximos(
-  sb: SupabaseClient,
-): Promise<TurnoConPaciente[]> {
-  const startOfToday = arLocalToUtc(hoyISOArgentina(), "00:00");
-
-  const { data, error } = await sb
-    .from("turnos")
-    .select("*, paciente:pacientes(id, nombre, telefono)")
-    .gte("fecha_hora", startOfToday)
-    .order("fecha_hora", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as unknown as TurnoConPaciente[];
-}
+import type { TurnoConDetalle, Turno } from "./types";
 
 // Turnos en un rango [desde, hasta) con paciente, servicio y profesional,
 // para la agenda del panel admin (vista día/semana). Ambos límites en ISO UTC.

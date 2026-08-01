@@ -45,14 +45,6 @@ export function formatListTime(iso: string | null): string {
   return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
 }
 
-// Nombre a mostrar: el nombre del contacto o su número.
-export function displayName(
-  name: string | null,
-  phone: string | null,
-): string {
-  return (name && name.trim()) || phone || "Sin número";
-}
-
 // Etiqueta de un contacto: nombre → @username → teléfono → id crudo.
 export function contactLabel(c: {
   name: string | null;

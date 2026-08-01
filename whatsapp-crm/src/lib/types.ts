@@ -52,42 +52,6 @@ export interface Message {
 
 export type AgentRole = "owner" | "profesional" | "secretaria";
 
-export interface Agent {
-  id: string;
-  auth_user_id: string | null;
-  tenant_id: string | null;
-  role: AgentRole;
-  name: string | null;
-  email: string | null;
-  created_at: string;
-}
-
-export type TenantStatus = "trialing" | "active" | "paused" | "cancelled";
-
-export interface Tenant {
-  id: string;
-  nombre: string;
-  rubro_slug: string;
-  status: TenantStatus;
-  whatsapp_phone_number_id: string | null;
-  whatsapp_waba_id: string | null;
-  messenger_page_id: string | null;
-  instagram_business_id: string | null;
-  created_at: string;
-}
-
-export interface Template {
-  id: string;
-  name: string;
-  language: string;
-  category: string | null;
-  body: string | null;
-  variables: unknown;
-  approved: boolean;
-  tenant_id: string | null;
-  created_at: string;
-}
-
 // Fila de la vista `conversation_list`: un contacto + su último mensaje.
 export interface ConversationListItem extends Contact {
   last_message_body: string | null;
@@ -203,10 +167,6 @@ export interface Turno {
 }
 
 // Turno + datos del paciente para listar sin joins manuales en la UI.
-export interface TurnoConPaciente extends Turno {
-  paciente: Pick<Paciente, "id" | "nombre" | "telefono"> | null;
-}
-
 // Turno + paciente + servicio + profesional, para la agenda admin.
 export interface TurnoConDetalle extends Turno {
   paciente: Pick<Paciente, "id" | "nombre" | "telefono"> | null;
