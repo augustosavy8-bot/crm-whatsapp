@@ -956,6 +956,8 @@ function Socios({ tenantId }: { tenantId: string }) {
   const [mpLinks, setMpLinks] = useState<Record<string, string>>({});
   // Links de invitación (crear cuenta) generados en esta sesión, por socio.
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
+  // Links de recuperación de contraseña generados en esta sesión, por socio.
+  const [recuperLinks, setRecuperLinks] = useState<Record<string, string>>({});
   const [copiado, setCopiado] = useState<string | null>(null);
   // Edición inline del email por socio (necesario para MercadoPago).
   const [editEmailId, setEditEmailId] = useState<string | null>(null);
@@ -1098,6 +1100,28 @@ function Socios({ tenantId }: { tenantId: string }) {
     setInviteLinks((m) => ({ ...m, [s.id]: link }));
     await copiar(s.id, link);
     cargar();
+  }
+
+  // Genera un link de recuperación de contraseña (sin email) para un socio que
+  // ya tiene cuenta y se lo copia, para mandarlo por WhatsApp.
+  async function recuperar(s: GymSocio) {
+    setError(null);
+    if (!s.email) {
+      setError("Ese socio no tiene email cargado: agregalo primero.");
+      return;
+    }
+    const res = await fetch("/api/admin/recuperar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: s.email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || "No se pudo generar el link de recuperación.");
+      return;
+    }
+    setRecuperLinks((m) => ({ ...m, [s.id]: data.link }));
+    await copiar(s.id, data.link);
   }
 
   async function copiar(id: string, texto: string) {
@@ -1330,9 +1354,42 @@ function Socios({ tenantId }: { tenantId: string }) {
                 {/* Acceso: link de invitación para crear cuenta */}
                 <div className="mt-2 border-t border-line pt-2">
                   {s.auth_user_id ? (
-                    <span className="text-[12px] font-semibold text-ok">
-                      ✓ Tiene cuenta de alumno
-                    </span>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[12px] font-semibold text-ok">
+                          ✓ Tiene cuenta de alumno
+                        </span>
+                        <button
+                          onClick={() => recuperar(s)}
+                          className="text-[12px] font-semibold text-accent hover:brightness-90"
+                        >
+                          {recuperLinks[s.id]
+                            ? "Nuevo link de recuperación"
+                            : "Recuperar contraseña"}
+                        </button>
+                        {copiado === s.id && (
+                          <span className="text-[11px] font-semibold text-ok">
+                            ¡Copiado!
+                          </span>
+                        )}
+                      </div>
+                      {recuperLinks[s.id] && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            readOnly
+                            value={recuperLinks[s.id]}
+                            onFocus={(e) => e.currentTarget.select()}
+                            className="min-w-0 flex-1 truncate rounded-lg bg-surface-2 px-2 py-1.5 text-[11px] text-muted"
+                          />
+                          <button
+                            onClick={() => copiar(s.id, recuperLinks[s.id])}
+                            className="shrink-0 rounded-full bg-ink px-3 py-1 text-[11px] font-bold text-white"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">

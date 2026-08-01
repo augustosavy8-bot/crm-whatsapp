@@ -40,6 +40,7 @@ export async function updateSession(request: NextRequest) {
     path === "/" || // la raíz decide sola: público -> /gimnasio, staff -> /dashboard
     path === "/login" ||
     path === "/registro" || // alta de alumno por invitación (token en la URL)
+    path === "/reset" || // recuperar contraseña (sesión de recovery en la URL)
     path.startsWith("/auth") ||
     path === "/privacy" ||
     path.startsWith("/privacy/") ||
@@ -57,6 +58,10 @@ export async function updateSession(request: NextRequest) {
   // demás (dashboard, inbox, pacientes, la raíz) lo mandamos a /turnos. La
   // seguridad real es RLS; esto es para que ni vea el chrome del CRM.
   if (user) {
+    // /reset se abre CON una sesión de recuperación: no lo mandamos al panel,
+    // el usuario tiene que poder elegir su clave nueva primero.
+    if (path === "/reset") return response;
+
     const { data: claimsData } = await supabase.auth.getClaims();
     const appRole = claimsData?.claims?.app_role as string | undefined;
     if (appRole === "alumno") {
