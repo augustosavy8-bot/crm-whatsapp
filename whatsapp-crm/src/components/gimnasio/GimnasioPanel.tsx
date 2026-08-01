@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuBell } from "react-icons/lu";
 import { createClient } from "@/lib/supabase/client";
 import { Toast } from "@/components/turnos/Toast";
@@ -94,7 +94,7 @@ export default function GimnasioPanel({ tenantId }: { tenantId: string }) {
 // precio, la API actualiza el débito automático de los socios ya adheridos.
 // ------------------------------------------------------------
 function Planes() {
-  const sb = createClient();
+  const sb = useMemo(() => createClient(), []);
   const [planes, setPlanes] = useState<GymPlan[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -318,7 +318,7 @@ function cuotaVencida(esSocio: boolean, cuotaHasta: string | null): boolean {
 // Tab Agenda: ocupación por día
 // ------------------------------------------------------------
 function Agenda() {
-  const sb = createClient();
+  const sb = useMemo(() => createClient(), []);
   const [fecha, setFecha] = useState(hoyISOArgentina);
   const [data, setData] = useState<GymOcupacionHorario[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -789,7 +789,7 @@ function AgregarAlumno({
 // Tab Horarios: alta y activar/desactivar
 // ------------------------------------------------------------
 function Horarios({ tenantId }: { tenantId: string }) {
-  const sb = createClient();
+  const sb = useMemo(() => createClient(), []);
   const [horarios, setHorarios] = useState<GymHorario[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -976,7 +976,7 @@ function fechaCorta(iso: string): string {
 }
 
 function Socios({ tenantId }: { tenantId: string }) {
-  const sb = createClient();
+  const sb = useMemo(() => createClient(), []);
   const [socios, setSocios] = useState<GymSocio[]>([]);
   const [planes, setPlanes] = useState<GymPlan[]>([]);
   const [cargando, setCargando] = useState(true);
