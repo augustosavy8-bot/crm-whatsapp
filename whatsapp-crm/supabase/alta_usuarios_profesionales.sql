@@ -76,7 +76,9 @@ begin
 end $$;
 
 -- ------------------------------------------------------------
--- Ejecución. Completá EMAIL y PASSWORD de cada uno. Los agent_id se
+-- Ejecución. Completá EMAIL y PASSWORD de cada uno ANTES de correr.
+-- NUNCA commitees emails/passwords reales acá: son credenciales. Usá una clave
+-- fuerte y que cada profesional la cambie en el primer login. Los agent_id se
 -- resuelven por nombre (los sembró 0019); si preferís, poné el uuid directo.
 -- ------------------------------------------------------------
 do $$
@@ -89,9 +91,9 @@ begin
   select id into v_lis     from public.agents where role = 'profesional' and (name ilike '%lis%' or name ilike '%ponzio%') limit 1;
   select id into v_gian    from public.agents where role = 'profesional' and (name ilike '%gian%' or name ilike '%orlandi%') limit 1;
 
-  perform public._alta_profesional(v_mariano, 'mariano@kine.com', 'kine1234');
-  perform public._alta_profesional(v_lis,     'lis@nutri.com',     'nutri1234');
-  perform public._alta_profesional(v_gian,    'gian@gimnasio.com',    'gimnasio1234');
+  perform public._alta_profesional(v_mariano, 'EMAIL_PROFESIONAL_1', 'CAMBIAR_CLAVE_FUERTE');
+  perform public._alta_profesional(v_lis,     'EMAIL_PROFESIONAL_2', 'CAMBIAR_CLAVE_FUERTE');
+  perform public._alta_profesional(v_gian,    'EMAIL_PROFESIONAL_3', 'CAMBIAR_CLAVE_FUERTE');
 end $$;
 
 -- Limpieza del helper (no lo dejamos colgado en la base).
