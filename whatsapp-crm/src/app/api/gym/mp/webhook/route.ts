@@ -44,18 +44,23 @@ export async function POST(request: NextRequest) {
     if (d?.id != null) dataId = String(d.id);
   }
 
-  // Firma: si hay secreto configurado, se exige válida. Sin secreto (borrador),
-  // no se puede validar y se acepta pero se registra en los logs.
+  // Firma OBLIGATORIA. Sin MP_WEBHOOK_SECRET no se puede validar el origen, y
+  // este endpoint hace escrituras sensibles (marca socios, extiende cuotas):
+  // fail-closed. No se procesa nada hasta configurar el secreto.
+  if (!process.env.MP_WEBHOOK_SECRET) {
+    console.error("[mp/webhook] MP_WEBHOOK_SECRET no configurado: se rechaza");
+    return NextResponse.json(
+      { error: "Webhook no configurado" },
+      { status: 503 },
+    );
+  }
   const firmaOk = verificarFirmaWebhook({
     xSignature: request.headers.get("x-signature"),
     xRequestId: request.headers.get("x-request-id"),
     dataId,
   });
-  if (process.env.MP_WEBHOOK_SECRET && !firmaOk) {
+  if (!firmaOk) {
     return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
-  }
-  if (!process.env.MP_WEBHOOK_SECRET) {
-    console.warn("[mp/webhook] sin MP_WEBHOOK_SECRET: no se validó la firma");
   }
 
   // Sin credenciales MP no podemos consultar el recurso: aceptamos y salimos.
@@ -75,10 +80,12 @@ export async function POST(request: NextRequest) {
         if (alumnoId) {
           const { data: al } = await sb
             .from("gym_alumnos")
-            .select("id, cuota_hasta")
+            .select("id, cuota_hasta, mp_last_payment_id")
             .eq("id", alumnoId)
             .maybeSingle();
-          if (al) {
+          // Idempotencia: si ya procesamos ESTE payment, no volver a extender
+          // (MP reintenta los webhooks). dataId es el id del pago.
+          if (al && al.mp_last_payment_id !== dataId) {
             const hoy = hoyISOArgentina();
             const actual = al.cuota_hasta as string | null;
             const base = actual && actual > hoy ? actual : hoy;
@@ -89,6 +96,7 @@ export async function POST(request: NextRequest) {
                 metodo_pago: "mercadopago",
                 mp_estado: "authorized",
                 cuota_hasta: sumarMesISO(base),
+                mp_last_payment_id: dataId,
               })
               .eq("id", alumnoId);
           }
