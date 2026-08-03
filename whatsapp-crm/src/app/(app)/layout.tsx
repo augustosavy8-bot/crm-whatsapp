@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getModulosTenant } from "@/lib/modulos";
@@ -46,7 +47,7 @@ export default async function AppLayout({
   const contenido = (
     <div className="flex h-[100dvh] flex-col bg-canvas">
       <header className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
-        <div className="flex shrink-0 items-center gap-2">
+        <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="Inicio">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/kinactiva-mark.png"
@@ -58,7 +59,7 @@ export default async function AppLayout({
             <span className="text-brand">KIN</span>
             <span className="text-accent">ACTIVA</span>
           </span>
-        </div>
+        </Link>
         <div className="flex min-w-0 flex-1 justify-center overflow-x-auto">
           <HeaderNav
             role={agente?.role}

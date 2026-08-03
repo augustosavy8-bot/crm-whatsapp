@@ -14,6 +14,8 @@ export default async function Home() {
   const supabase = await createClient();
   const agent = await getCurrentAgent(supabase);
   if (agent) {
+    // El dueño con panel de estadísticas cae ahí (puede navegar al resto).
+    if (agent.panel_stats) redirect("/panel");
     // Staff del gym que no es owner (profesional) aterriza en el panel de gym.
     if (agent.role === "profesional") redirect("/gym");
     const { inbox } = await getModulosTenant(supabase);

@@ -8,6 +8,7 @@ export interface CurrentAgent {
   name: string | null;
   email: string | null;
   gym_admin: boolean;
+  panel_stats: boolean;
 }
 
 // Agente logueado (fila propia en `agents`, ya resuelta por RLS/tenant).
@@ -22,12 +23,16 @@ export async function getCurrentAgent(
 
   const { data } = await sb
     .from("agents")
-    .select("id, tenant_id, role, name, email, gym_admin")
+    .select("id, tenant_id, role, name, email, gym_admin, panel_stats")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (!data || !data.tenant_id) return null;
-  return { ...data, gym_admin: data.gym_admin === true } as CurrentAgent;
+  return {
+    ...data,
+    gym_admin: data.gym_admin === true,
+    panel_stats: data.panel_stats === true,
+  } as CurrentAgent;
 }
 
 // Staff del gimnasio: accede al panel de cupo completo (agenda, confirmar,
