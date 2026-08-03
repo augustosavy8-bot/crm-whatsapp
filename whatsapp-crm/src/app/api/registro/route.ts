@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { notificarNuevoUsuario } from "@/lib/push/send";
 
 // Registro de alumno POR INVITACIÓN. Solo funciona con un token válido, no
 // vencido y no usado, generado por el staff (/api/gym/admin/invitar). Crea la
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
   // Valida el token: existe, no vencido, no usado.
   const { data: alumno } = await sb
     .from("gym_alumnos")
-    .select("id, nombre, auth_user_id, invite_expires_at")
+    .select("id, nombre, auth_user_id, invite_expires_at, tenant_id")
     .eq("invite_token", token)
     .maybeSingle();
 
@@ -96,6 +97,14 @@ export async function POST(request: NextRequest) {
   if (linkErr) {
     await sb.auth.admin.deleteUser(created.user.id).catch(() => {});
     return NextResponse.json({ error: linkErr.message }, { status: 400 });
+  }
+
+  // Aviso al dueño (best-effort): se creó una cuenta de alumno.
+  if (alumno.tenant_id) {
+    await notificarNuevoUsuario(
+      alumno.tenant_id as string,
+      `${alumno.nombre} (alumno) creó su cuenta: ${email}`,
+    ).catch(() => {});
   }
 
   return NextResponse.json({ ok: true });

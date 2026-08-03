@@ -87,3 +87,30 @@ export async function sendPushToAlumno(
   if (error || !subs?.length) return;
   await entregar(subs as SubRow[], payload);
 }
+
+// Aviso de "se creó una cuenta nueva" SOLO a los agentes del tenant marcados
+// con notif_nuevos_usuarios (típicamente el dueño). Best-effort.
+export async function notificarNuevoUsuario(
+  tenantId: string,
+  descripcion: string,
+): Promise<void> {
+  if (!configure()) return;
+  const sb = createServiceClient();
+  const { data: agentes } = await sb
+    .from("agents")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("notif_nuevos_usuarios", true);
+  const ids = (agentes ?? []).map((a) => a.id as string);
+  if (!ids.length) return;
+  const { data: subs } = await sb
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .in("agent_id", ids);
+  if (!subs?.length) return;
+  await entregar(subs as SubRow[], {
+    title: "Nuevo usuario en KINACTIVA",
+    body: descripcion,
+    url: "/gym",
+  });
+}

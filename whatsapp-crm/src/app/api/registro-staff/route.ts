@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { notificarNuevoUsuario } from "@/lib/push/send";
 
 // Registro de STAFF por invitación. Solo con un invite_token válido (no vencido,
 // no usado) puesto por un admin sobre una ficha de `agents` que espera login.
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
   // Token válido, no vencido, y la ficha todavía sin login.
   const { data: agent } = await sb
     .from("agents")
-    .select("id, auth_user_id, invite_expires_at")
+    .select("id, auth_user_id, invite_expires_at, tenant_id, name")
     .eq("invite_token", token)
     .maybeSingle();
 
@@ -107,6 +108,14 @@ export async function POST(request: NextRequest) {
     .delete()
     .eq("auth_user_id", created.user.id)
     .neq("id", agent.id);
+
+  // Aviso al dueño (best-effort): se creó una cuenta de staff.
+  if (agent.tenant_id) {
+    await notificarNuevoUsuario(
+      agent.tenant_id as string,
+      `${agent.name ?? "Un profesor"} (profesor/admin) creó su cuenta: ${email}`,
+    ).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true });
 }
