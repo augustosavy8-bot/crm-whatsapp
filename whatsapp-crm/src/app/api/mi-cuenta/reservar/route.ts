@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { anotarFijo, reservarSuelta } from "@/lib/gymCupo";
 import { notificarReservaGym } from "@/lib/gymNotif";
+import { reservaBloqueadaPorDeuda, MENSAJE_DEUDA } from "@/lib/gymDeuda";
 
 // Alta de reserva del alumno LOGUEADO. Igual que /api/gym/reservar pero el
 // nombre y el teléfono salen de la sesión: no se re-piden ni se pueden falsear.
@@ -20,6 +21,11 @@ export async function POST(request: NextRequest) {
   const alumno = await getCurrentAlumno(supabase);
   if (!alumno) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  // Para reservar hay que estar al día (con la gracia del 1 al 20).
+  if (reservaBloqueadaPorDeuda(alumno.cuota_hasta)) {
+    return NextResponse.json({ error: MENSAJE_DEUDA }, { status: 402 });
   }
 
   let body: Payload;

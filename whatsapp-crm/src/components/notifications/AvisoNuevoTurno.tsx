@@ -4,14 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Aviso in-app para el staff del gimnasio: cuando un alumno se anota a una
-// clase, entra un banner (desde cualquier pantalla del panel) con el nombre y
-// el horario, y deja confirmar en un tap sin salir de donde está. Complementa
-// al push (panel cerrado) y a la campana de la agenda (panel abierto en esa
-// pestaña): este aviso es global y accionable.
+// Aviso in-app (FYI) para el staff del gimnasio: cuando un alumno se anota a una
+// clase, entra un banner con el nombre y el horario. La reserva ya queda
+// confirmada sola (auto-confirmación), así que esto es informativo — sin botón
+// de aceptar. Complementa al push (panel cerrado) y a la campana de la agenda.
 //
-// Escucha los INSERT de gym_reservas_sueltas / gym_turnos_fijos por Realtime
-// (publicación agregada en 0033). "Confirmar" pega a /api/gym/admin/decidir.
+// Escucha los INSERT de gym_reservas_sueltas / gym_turnos_fijos por Realtime.
 
 const MUTE_KEY = "kinactiva_notif_muted";
 const DIAS = [
@@ -26,7 +24,6 @@ const DIAS = [
 const hhmm = (h: string) => h.slice(0, 5);
 
 type Tipo = "suelta" | "fijo";
-type Fase = "nuevo" | "confirmando" | "confirmado";
 
 interface Aviso {
   key: number;
@@ -58,11 +55,7 @@ export default function AvisoNuevoTurno() {
   const supabase = useRef(createClient()).current;
 
   const [aviso, setAviso] = useState<Aviso | null>(null);
-  const [fase, setFase] = useState<Fase>("nuevo");
   const [salir, setSalir] = useState(false);
-  const [confirmadoTexto, setConfirmadoTexto] = useState<string>(
-    "Recibió la confirmación por WhatsApp.",
-  );
 
   const seq = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -110,7 +103,6 @@ export default function AvisoNuevoTurno() {
       luego(320, () => {
         setAviso(null);
         setSalir(false);
-        setFase("nuevo");
       });
       return true;
     });
@@ -125,7 +117,6 @@ export default function AvisoNuevoTurno() {
 
       // Base inmediata; enriquezco nombre + horario abajo (async).
       setAviso({ key, tipo, id: row.id ?? "", nombre: "Un alumno", detalle: "Se anotó a una clase" });
-      setFase("nuevo");
       setSalir(false);
 
       (async () => {
@@ -194,37 +185,6 @@ export default function AvisoNuevoTurno() {
 
   useEffect(() => () => limpiarTimers(), [limpiarTimers]);
 
-  const confirmar = useCallback(async () => {
-    if (!aviso || fase !== "nuevo") return;
-    limpiarTimers();
-    setFase("confirmando");
-    try {
-      const res = await fetch("/api/gym/admin/decidir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo: aviso.tipo, id: aviso.id, accion: "confirmar" }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        warning?: string;
-      };
-      if (!res.ok) {
-        // Falló de verdad: vuelvo a estado nuevo para reintentar.
-        setFase("nuevo");
-        luego(5200, cerrar);
-        return;
-      }
-      setConfirmadoTexto(
-        data.warning ?? "Recibió la confirmación por WhatsApp.",
-      );
-      setFase("confirmado");
-      luego(1800, cerrar);
-    } catch {
-      setFase("nuevo");
-      luego(5200, cerrar);
-    }
-  }, [aviso, fase, limpiarTimers, luego, cerrar]);
-
   const verEnAgenda = useCallback(() => {
     limpiarTimers();
     router.push("/gym");
@@ -232,9 +192,6 @@ export default function AvisoNuevoTurno() {
   }, [limpiarTimers, router, cerrar]);
 
   if (!aviso) return null;
-
-  const confirmado = fase === "confirmado";
-  const confirmando = fase === "confirmando";
 
   return (
     <div
@@ -252,41 +209,33 @@ export default function AvisoNuevoTurno() {
       >
         <div className="relative flex flex-col gap-2.5 overflow-hidden rounded-panel border border-line bg-surface p-3.5 shadow-pop">
           <div className="flex items-start gap-3">
-            {/* Ícono: calendario+ (nuevo) -> check dibujado (confirmado). */}
+            {/* Ícono calendario+ */}
             <span
-              className="grid size-[38px] shrink-0 place-items-center rounded-[14px] transition-colors"
+              className="grid size-[38px] shrink-0 place-items-center rounded-[14px]"
               style={{
-                background: confirmado ? "rgba(47,174,107,.15)" : "var(--color-accent-soft)",
-                color: confirmado ? "var(--color-ok)" : "var(--color-accent)",
+                background: "var(--color-accent-soft)",
+                color: "var(--color-accent)",
                 animation: "kfPop .45s cubic-bezier(.2,.8,.25,1) both",
               }}
             >
-              {confirmado ? (
-                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12.6l4.4 4.4L19 7.4" strokeDasharray="34" style={{ animation: "kfCheck .45s cubic-bezier(.4,0,.2,1) both" }} />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
-                  <path d="M4.5 6.5h15v13h-15z" />
-                  <path d="M8 3.5v3M16 3.5v3M4.5 10.5h15" />
-                  <path d="M12 13.5v4M10 15.5h4" />
-                </svg>
-              )}
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                <path d="M4.5 6.5h15v13h-15z" />
+                <path d="M8 3.5v3M16 3.5v3M4.5 10.5h15" />
+                <path d="M12 13.5v4M10 15.5h4" />
+              </svg>
             </span>
 
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span
                 className="text-[10px] font-bold uppercase tracking-[0.1em]"
-                style={{ color: confirmado ? "var(--color-ok)" : "var(--color-accent)" }}
+                style={{ color: "var(--color-accent)" }}
               >
-                {confirmado ? "Turno confirmado" : "Nuevo turno · web"}
+                Nueva reserva
               </span>
               <span className="text-[15px] font-bold tracking-tight text-ink">
-                {confirmado ? `Le avisamos a ${aviso.nombre.split(" ")[0]}` : `${aviso.nombre} se anotó`}
+                {aviso.nombre} se anotó
               </span>
-              <span className="text-xs text-muted text-pretty">
-                {confirmado ? confirmadoTexto : aviso.detalle}
-              </span>
+              <span className="text-xs text-muted text-pretty">{aviso.detalle}</span>
             </div>
 
             <button
@@ -299,39 +248,18 @@ export default function AvisoNuevoTurno() {
             </button>
           </div>
 
-          {!confirmado && (
-            <div className="flex gap-1.5 pl-[49px]">
-              <button
-                type="button"
-                onClick={confirmar}
-                disabled={confirmando}
-                className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold text-ok transition active:scale-95"
-                style={{ background: "rgba(47,174,107,.15)" }}
-              >
-                {confirmando && (
-                  <span
-                    className="size-[11px] rounded-full border-2 border-t-transparent"
-                    style={{
-                      borderColor: "rgba(47,174,107,.35)",
-                      borderTopColor: "var(--color-ok)",
-                      animation: "kfSpin .7s linear infinite",
-                    }}
-                  />
-                )}
-                <span>{confirmando ? "Confirmando…" : "✓ Confirmar"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={verEnAgenda}
-                className="rounded-full border border-line px-3.5 py-2 text-xs font-bold text-muted transition hover:border-faint hover:text-ink active:scale-95"
-              >
-                Ver en la agenda
-              </button>
-            </div>
-          )}
+          <div className="flex gap-1.5 pl-[49px]">
+            <button
+              type="button"
+              onClick={verEnAgenda}
+              className="rounded-full border border-line px-3.5 py-2 text-xs font-bold text-muted transition hover:border-faint hover:text-ink active:scale-95"
+            >
+              Ver en la agenda
+            </button>
+          </div>
 
           {/* Barra de vida: se agota en 5.2 s y el aviso se cierra solo. */}
-          {fase === "nuevo" && !salir && (
+          {!salir && (
             <span
               className="absolute inset-x-0 bottom-0 h-[3px] origin-left"
               style={{

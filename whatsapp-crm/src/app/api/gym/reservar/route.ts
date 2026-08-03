@@ -3,6 +3,8 @@ import { getGymContext } from "@/lib/gym";
 import { anotarFijo, reservarSuelta } from "@/lib/gymCupo";
 import { notificarReservaGym } from "@/lib/gymNotif";
 import { normalizeArPhone } from "@/lib/phone";
+import { createServiceClient } from "@/lib/supabase/service";
+import { reservaBloqueadaPorDeuda, MENSAJE_DEUDA } from "@/lib/gymDeuda";
 
 // Alta de reserva de clase del gimnasio, sin cuenta. Dos modos que conviven:
 //   - "suelta": una fecha puntual.
@@ -60,6 +62,19 @@ export async function POST(request: NextRequest) {
   const gym = await getGymContext();
   if (!gym) {
     return NextResponse.json({ error: "Gimnasio no configurado" }, { status: 503 });
+  }
+
+  // Para reservar hay que estar al día (gracia del 1 al 20). El alumno se
+  // identifica por teléfono; si es nuevo (sin cuota), igual entra en la gracia.
+  const svc = createServiceClient();
+  const { data: alu } = await svc
+    .from("gym_alumnos")
+    .select("cuota_hasta")
+    .eq("tenant_id", gym.tenantId)
+    .eq("telefono", telefono)
+    .maybeSingle();
+  if (reservaBloqueadaPorDeuda((alu?.cuota_hasta as string | null) ?? null)) {
+    return NextResponse.json({ error: MENSAJE_DEUDA }, { status: 402 });
   }
 
   try {
