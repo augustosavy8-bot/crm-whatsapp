@@ -40,6 +40,7 @@ export async function updateSession(request: NextRequest) {
     path === "/" || // la raíz decide sola: público -> /gimnasio, staff -> /dashboard
     path === "/login" ||
     path === "/registro" || // alta de alumno por invitación (token en la URL)
+    path === "/registro-staff" || // alta de staff por invitación (token en la URL)
     path === "/reset" || // recuperar contraseña (sesión de recovery en la URL)
     path.startsWith("/auth") ||
     path === "/privacy" ||
