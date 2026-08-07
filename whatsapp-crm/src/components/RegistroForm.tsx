@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Formulario de registro por invitación. El nombre y el WhatsApp vienen de la
-// ficha (bloqueados); el alumno solo define email + contraseña. Tras crear la
-// cuenta, inicia sesión y cae en su panel.
+// Formulario de registro por invitación. El nombre viene de la ficha (bloqueado).
+// El WhatsApp también, SALVO que la ficha no tenga (socios del padrón importado):
+// ahí el alumno lo carga y es obligatorio. Define email + contraseña. Tras crear
+// la cuenta, inicia sesión y cae en su panel.
 export default function RegistroForm({
   token,
   nombre,
@@ -14,10 +15,13 @@ export default function RegistroForm({
 }: {
   token: string;
   nombre: string;
-  telefono: string;
+  telefono: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const telFicha = telefono?.trim() ?? "";
+  const telBloqueado = telFicha.length > 0;
+  const [tel, setTel] = useState(telFicha);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,7 +35,7 @@ export default function RegistroForm({
       const res = await fetch("/api/registro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email, password }),
+        body: JSON.stringify({ token, email, password, telefono: tel.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo crear la cuenta.");
@@ -71,7 +75,20 @@ export default function RegistroForm({
 
       <div className="space-y-1.5">
         <label className="text-xs font-semibold text-muted">WhatsApp</label>
-        <div className={locked}>{telefono}</div>
+        {telBloqueado ? (
+          <div className={locked}>{telFicha}</div>
+        ) : (
+          <input
+            type="tel"
+            required
+            inputMode="tel"
+            autoComplete="tel"
+            value={tel}
+            onChange={(e) => setTel(e.target.value)}
+            className={input}
+            placeholder="Tu número de WhatsApp"
+          />
+        )}
       </div>
 
       <div className="space-y-1.5">

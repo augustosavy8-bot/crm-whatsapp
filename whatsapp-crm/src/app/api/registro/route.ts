@@ -13,6 +13,7 @@ interface Payload {
   token?: string;
   email?: string;
   password?: string;
+  telefono?: string; // solo lo usan los socios cuya ficha no traía teléfono
 }
 
 export async function POST(request: NextRequest) {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   // Valida el token: existe, no vencido, no usado.
   const { data: alumno } = await sb
     .from("gym_alumnos")
-    .select("id, nombre, auth_user_id, invite_expires_at, tenant_id")
+    .select("id, nombre, telefono, auth_user_id, invite_expires_at, tenant_id")
     .eq("invite_token", token)
     .maybeSingle();
 
@@ -63,6 +64,36 @@ export async function POST(request: NextRequest) {
       { error: "La invitación venció. Pedile al gimnasio una nueva." },
       { status: 400 },
     );
+  }
+
+  // Teléfono: si la ficha ya tenía uno, se respeta. Si no (socios del padrón
+  // importado), el alumno lo cargó en el registro y es obligatorio — lo
+  // necesita para reservar (el cupo se maneja por teléfono).
+  const telActual = (alumno.telefono as string | null)?.trim() ?? "";
+  let telefonoFinal = telActual;
+  if (!telActual) {
+    const t = (body.telefono ?? "").trim();
+    if (t.replace(/\D/g, "").length < 8) {
+      return NextResponse.json(
+        { error: "Ingresá un WhatsApp válido." },
+        { status: 400 },
+      );
+    }
+    // No puede pisar el teléfono de otra ficha del mismo gimnasio (índice único).
+    const { data: dup } = await sb
+      .from("gym_alumnos")
+      .select("id")
+      .eq("tenant_id", alumno.tenant_id as string)
+      .eq("telefono", t)
+      .neq("id", alumno.id)
+      .maybeSingle();
+    if (dup) {
+      return NextResponse.json(
+        { error: "Ese WhatsApp ya está registrado con otra ficha. Avisá al gimnasio." },
+        { status: 409 },
+      );
+    }
+    telefonoFinal = t;
   }
 
   // Crea la cuenta ya confirmada.
@@ -89,6 +120,7 @@ export async function POST(request: NextRequest) {
     .update({
       auth_user_id: created.user.id,
       email,
+      telefono: telefonoFinal,
       invite_token: null,
       invite_expires_at: null,
     })

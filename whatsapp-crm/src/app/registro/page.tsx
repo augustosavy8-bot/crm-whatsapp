@@ -14,7 +14,7 @@ export default async function RegistroPage({
 }) {
   const { token } = await searchParams;
 
-  let alumno: { nombre: string; telefono: string } | null = null;
+  let alumno: { nombre: string; telefono: string | null } | null = null;
   let motivo = "";
 
   if (!token) {
