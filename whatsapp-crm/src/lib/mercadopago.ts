@@ -78,6 +78,51 @@ export async function crearPreapproval(args: {
   return data as unknown as Preapproval;
 }
 
+export interface Preferencia {
+  id: string;
+  init_point?: string;
+}
+
+// Crea una preferencia de Checkout Pro para un PAGO ÚNICO (una cuota suelta) y
+// devuelve el init_point: la URL a la que el socio entra para pagar ese mes con
+// tarjeta/dinero en cuenta, SIN suscribirse. `external_reference` = alumnoId, que
+// es lo que el webhook usa para acreditar el pago y correr la cuota +1 mes.
+export async function crearPreferenciaPago(args: {
+  alumnoId: string;
+  montoARS: number;
+  titulo: string;
+  backUrl: string;
+  notificationUrl: string;
+  email?: string | null;
+}): Promise<Preferencia> {
+  const res = await fetch(`${MP_API}/checkout/preferences`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      items: [
+        {
+          title: args.titulo,
+          quantity: 1,
+          unit_price: args.montoARS,
+          currency_id: "ARS",
+        },
+      ],
+      external_reference: args.alumnoId,
+      ...(args.email ? { payer: { email: args.email } } : {}),
+      back_urls: {
+        success: args.backUrl,
+        failure: args.backUrl,
+        pending: args.backUrl,
+      },
+      auto_return: "approved",
+      notification_url: args.notificationUrl,
+    }),
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  if (!res.ok) throw mpError(res.status, data);
+  return data as unknown as Preferencia;
+}
+
 // Actualiza el monto de una suscripción existente (cuando cambia el precio del
 // plan). MP aplica el nuevo monto en el próximo cobro. Solo tiene sentido sobre
 // suscripciones activas/pendientes (authorized|pending).

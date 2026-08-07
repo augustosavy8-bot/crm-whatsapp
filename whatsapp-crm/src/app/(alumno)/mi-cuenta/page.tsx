@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { getGymContext } from "@/lib/gym";
 import { hoyISOArgentina } from "@/lib/tz";
+import { cuotaPorVencer, debitoActivo } from "@/lib/gymCuota";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
+import CuotaAcciones from "@/components/gimnasio/CuotaAcciones";
 import InstruccionesInstalar from "@/components/gimnasio/InstruccionesInstalar";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +69,17 @@ export default async function MiCuentaPage() {
   const cuota = estadoCuota(alumno.cuota_hasta, alumno.metodo_pago, alumno.mp_estado);
   const primerNombre = alumno.nombre.split(" ")[0];
 
+  // Precio del plan del socio (fuente confiable server-side), para mostrar el
+  // monto en el botón de pago. El alumno puede no tener RLS sobre gym_planes.
+  const svc = createServiceClient();
+  const { data: alPlan } = await svc
+    .from("gym_alumnos")
+    .select("plan:gym_planes(precio)")
+    .eq("id", alumno.id)
+    .maybeSingle();
+  const montoARS =
+    (alPlan?.plan as unknown as { precio: number } | null)?.precio ?? null;
+
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-6 sm:pt-8">
       <div className="mb-5 space-y-4">
@@ -76,6 +90,13 @@ export default async function MiCuentaPage() {
           <p className="mt-0.5 text-[13px] text-muted">{cuota.detalle}</p>
         </div>
       </div>
+
+      <CuotaAcciones
+        montoARS={montoARS}
+        mostrarPago={cuotaPorVencer(alumno.cuota_hasta)}
+        debitoActivo={debitoActivo(alumno.metodo_pago, alumno.mp_estado)}
+        tieneEmail={Boolean(alumno.email)}
+      />
 
       <ClasesFlow
         gimnasioNombre={gym?.nombre ?? "KINACTIVA"}

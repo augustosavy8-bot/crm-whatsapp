@@ -89,14 +89,20 @@ export async function POST(request: NextRequest) {
             const hoy = hoyISOArgentina();
             const actual = al.cuota_hasta as string | null;
             const base = actual && actual > hoy ? actual : hoy;
+            // Un pago con `preapproval_id` viene de la SUSCRIPCIÓN (débito
+            // automático); uno sin él es un pago ÚNICO (Checkout Pro). Solo el
+            // primero marca al socio como adherido al débito — si no, un pago
+            // suelto lo haría figurar en débito sin estarlo.
+            const esSuscripcion = Boolean(pago.preapproval_id);
             await sb
               .from("gym_alumnos")
               .update({
                 es_socio: true,
-                metodo_pago: "mercadopago",
-                mp_estado: "authorized",
                 cuota_hasta: sumarMesISO(base),
                 mp_last_payment_id: dataId,
+                ...(esSuscripcion
+                  ? { metodo_pago: "mercadopago", mp_estado: "authorized" }
+                  : {}),
               })
               .eq("id", alumnoId);
           }
