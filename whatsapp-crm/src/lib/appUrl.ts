@@ -11,7 +11,12 @@
 //   2. el origin actual, SI no es una URL de deployment de Vercel (así dev en
 //      localhost y el dominio real siguen funcionando sin configurar nada)
 //   3. el dominio de producción como último recurso
-const DOMINIO_DEFAULT = "https://kinactiva.com";
+//
+// OJO: hoy la app se sirve en gym.kinactiva.com (Vercel). El dominio raíz
+// kinactiva.com todavía apunta al sitio viejo (no se hizo el switch), así que
+// NO sirve para los links. Cuando se migre kinactiva.com a esta app, cambiar
+// este default (o mejor, setear NEXT_PUBLIC_APP_URL en Vercel).
+const DOMINIO_DEFAULT = "https://gym.kinactiva.com";
 
 export function appBaseUrl(fallbackOrigin?: string): string {
   const env = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "");
