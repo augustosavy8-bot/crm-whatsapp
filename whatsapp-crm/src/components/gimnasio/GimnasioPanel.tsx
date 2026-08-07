@@ -20,6 +20,7 @@ import {
 } from "@/lib/gymCupoAdmin";
 import { hoyISOArgentina, sumarDiasISO } from "@/lib/tz";
 import { normalizeArPhone } from "@/lib/phone";
+import { appBaseUrl } from "@/lib/appUrl";
 
 // ============================================================
 // Panel admin del gimnasio (owner / gym_admin). Dos tabs:
@@ -1133,7 +1134,7 @@ function Socios({ tenantId }: { tenantId: string }) {
       setError(data.error || "No se pudo generar la invitación.");
       return;
     }
-    const link = `${window.location.origin}/registro?token=${data.token}`;
+    const link = `${appBaseUrl(window.location.origin)}/registro?token=${data.token}`;
     setInviteLinks((m) => ({ ...m, [s.id]: link }));
     await copiar(s.id, link);
     cargar();
@@ -1156,8 +1157,9 @@ function Socios({ tenantId }: { tenantId: string }) {
       if (invites.length === 0) {
         setBulkTexto("Todos los socios ya tienen cuenta. No hay links para generar.");
       } else {
+        const base = appBaseUrl(window.location.origin);
         const texto = invites
-          .map((i) => `${i.nombre}: ${window.location.origin}/registro?token=${i.token}`)
+          .map((i) => `${i.nombre}: ${base}/registro?token=${i.token}`)
           .join("\n");
         setBulkTexto(texto);
       }

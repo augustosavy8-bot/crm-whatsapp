@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent, esGymStaff } from "@/lib/agent";
 import { crearPreapproval, mpConfigurado } from "@/lib/mercadopago";
+import { appBaseUrl } from "@/lib/appUrl";
 
 // Genera el link de adhesión al débito automático de MercadoPago para un socio.
 // Lo dispara el admin (owner/gym_admin) desde el panel; el link se le pasa al
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const origin = new URL(request.url).origin;
+  const origin = appBaseUrl(new URL(request.url).origin);
   try {
     const pre = await crearPreapproval({
       alumnoId,

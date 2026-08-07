@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { crearPreferenciaPago, mpConfigurado } from "@/lib/mercadopago";
+import { appBaseUrl } from "@/lib/appUrl";
 
 // Pago ÚNICO de la cuota, iniciado por el ALUMNO logueado (no el admin). Toma el
 // precio de su plan y crea una preferencia de Checkout Pro; el webhook existente
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const origin = new URL(request.url).origin;
+  const origin = appBaseUrl(new URL(request.url).origin);
   try {
     const pref = await crearPreferenciaPago({
       alumnoId: alumno.id,

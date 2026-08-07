@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { crearPreapproval, mpConfigurado } from "@/lib/mercadopago";
+import { appBaseUrl } from "@/lib/appUrl";
 
 // Adhesión al débito automático iniciada por el propio ALUMNO (la versión admin
 // vive en /api/gym/mp/adherir). Crea el preapproval con el precio de su plan y
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const origin = new URL(request.url).origin;
+  const origin = appBaseUrl(new URL(request.url).origin);
   try {
     const pre = await crearPreapproval({
       alumnoId: alumno.id,

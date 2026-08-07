@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent } from "@/lib/agent";
 import { createServiceClient } from "@/lib/supabase/service";
+import { appBaseUrl } from "@/lib/appUrl";
 
 // Recuperación de contraseña SIN email: un admin (owner o gym_admin) genera un
 // link de recuperación para un usuario de SU gimnasio y se lo pasa por fuera
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Genera el link de recuperación (no manda email). Vuelve a /reset.
-  const origin = new URL(request.url).origin;
+  const origin = appBaseUrl(new URL(request.url).origin);
   const svc = createServiceClient();
   const { data, error } = await svc.auth.admin.generateLink({
     type: "recovery",
