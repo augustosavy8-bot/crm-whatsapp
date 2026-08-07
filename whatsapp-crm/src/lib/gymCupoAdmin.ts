@@ -45,7 +45,7 @@ export interface GymPlan {
 export interface GymSocio {
   id: string;
   nombre: string;
-  telefono: string;
+  telefono: string | null; // los socios importados del padrón no traen teléfono
   email: string | null;
   es_socio: boolean;
   cuota_hasta: string | null;

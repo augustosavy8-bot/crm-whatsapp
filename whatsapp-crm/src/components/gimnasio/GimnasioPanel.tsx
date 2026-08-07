@@ -996,6 +996,9 @@ function Socios({ tenantId }: { tenantId: string }) {
   // Edición inline del email por socio (necesario para MercadoPago).
   const [editEmailId, setEditEmailId] = useState<string | null>(null);
   const [emailVal, setEmailVal] = useState("");
+  // Generación masiva de links de acceso (para el padrón importado).
+  const [bulkCargando, setBulkCargando] = useState(false);
+  const [bulkTexto, setBulkTexto] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -1136,6 +1139,36 @@ function Socios({ tenantId }: { tenantId: string }) {
     cargar();
   }
 
+  // Genera links de acceso para TODOS los socios que aún no tienen cuenta y arma
+  // un texto "Nombre — link" por línea, listo para copiar y mandar por WhatsApp.
+  async function invitarTodos() {
+    setError(null);
+    setBulkTexto(null);
+    setBulkCargando(true);
+    try {
+      const res = await fetch("/api/gym/admin/invitar-todos", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudieron generar los links.");
+        return;
+      }
+      const invites = (data.invites ?? []) as { nombre: string; token: string }[];
+      if (invites.length === 0) {
+        setBulkTexto("Todos los socios ya tienen cuenta. No hay links para generar.");
+      } else {
+        const texto = invites
+          .map((i) => `${i.nombre}: ${window.location.origin}/registro?token=${i.token}`)
+          .join("\n");
+        setBulkTexto(texto);
+      }
+      cargar();
+    } catch {
+      setError("Sin conexión. Probá de nuevo.");
+    } finally {
+      setBulkCargando(false);
+    }
+  }
+
   // Genera un link de recuperación de contraseña (sin email) para un socio que
   // ya tiene cuenta y se lo copia, para mandarlo por WhatsApp.
   async function recuperar(s: GymSocio) {
@@ -1172,7 +1205,7 @@ function Socios({ tenantId }: { tenantId: string }) {
     (s) =>
       !q.trim() ||
       s.nombre.toLowerCase().includes(q.toLowerCase()) ||
-      s.telefono.includes(q),
+      (s.telefono ?? "").includes(q),
   );
 
   const input =
@@ -1205,6 +1238,40 @@ function Socios({ tenantId }: { tenantId: string }) {
             {guardando ? "…" : "Agregar"}
           </button>
         </div>
+      </div>
+
+      {/* Invitación masiva: un link de acceso por cada socio sin cuenta. */}
+      <div className="space-y-2 rounded-panel border border-line bg-surface p-4 shadow-card">
+        <div className="text-[14px] font-bold">Links de acceso para los socios</div>
+        <p className="text-[12px] text-muted">
+          Genera un link por cada socio que todavía no tiene cuenta
+          {" "}({socios.filter((s) => !s.auth_user_id).length} sin cuenta). Copiás
+          la lista y le mandás a cada uno el suyo para que se registre.
+        </p>
+        <button
+          onClick={invitarTodos}
+          disabled={bulkCargando}
+          className="rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+        >
+          {bulkCargando ? "Generando…" : "Generar links de acceso"}
+        </button>
+        {bulkTexto !== null && (
+          <div className="space-y-2 pt-1">
+            <textarea
+              readOnly
+              value={bulkTexto}
+              rows={6}
+              onFocus={(e) => e.currentTarget.select()}
+              className={`${input} w-full font-mono text-[11px] leading-relaxed`}
+            />
+            <button
+              onClick={() => copiar("bulk", bulkTexto)}
+              className="rounded-full bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink hover:bg-accent hover:text-white"
+            >
+              {copiado === "bulk" ? "¡Copiado!" : "Copiar toda la lista"}
+            </button>
+          </div>
+        )}
       </div>
 
       <input
