@@ -1077,19 +1077,39 @@ function Socios({ tenantId }: { tenantId: string }) {
     // Extiende un mes: desde su vencimiento si sigue vigente, o desde hoy.
     const hoy = hoyISOArgentina();
     const base = s.cuota_hasta && s.cuota_hasta > hoy ? s.cuota_hasta : hoy;
+    const nuevaCuota = sumarMesISO(base);
+    // Optimista: actualizo la tarjeta en el momento, sin recargar la lista.
+    // Guardo el estado previo por si el guardado falla y hay que revertir.
+    const previo = { es_socio: s.es_socio, cuota_hasta: s.cuota_hasta };
+    setError(null);
+    setSocios((prev) =>
+      prev.map((x) =>
+        x.id === s.id ? { ...x, es_socio: true, cuota_hasta: nuevaCuota } : x,
+      ),
+    );
     try {
-      await updateGymSocio(sb, s.id, { es_socio: true, cuota_hasta: sumarMesISO(base) });
-      cargar();
+      await updateGymSocio(sb, s.id, { es_socio: true, cuota_hasta: nuevaCuota });
     } catch (e) {
+      // Revierto la tarjeta a como estaba y aviso.
+      setSocios((prev) =>
+        prev.map((x) => (x.id === s.id ? { ...x, ...previo } : x)),
+      );
       setError(e instanceof Error ? e.message : "No se pudo registrar el pago.");
     }
   }
 
   async function setMetodo(s: GymSocio, metodo: "efectivo" | "mercadopago") {
+    const previo = s.metodo_pago;
+    setError(null);
+    setSocios((prev) =>
+      prev.map((x) => (x.id === s.id ? { ...x, metodo_pago: metodo } : x)),
+    );
     try {
       await updateGymSocio(sb, s.id, { metodo_pago: metodo });
-      cargar();
     } catch (e) {
+      setSocios((prev) =>
+        prev.map((x) => (x.id === s.id ? { ...x, metodo_pago: previo } : x)),
+      );
       setError(e instanceof Error ? e.message : "No se pudo actualizar.");
     }
   }
