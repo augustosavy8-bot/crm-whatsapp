@@ -9,14 +9,18 @@ import {
   getGymAlumnos,
   getGymHorarios,
   getGymOcupacion,
+  getPagosSocio,
   getPlanes,
+  registrarPagoGym,
   setGymHorarioActivo,
   updateGymSocio,
   type GymAlumnoEnClase,
   type GymHorario,
   type GymOcupacionHorario,
+  type GymPago,
   type GymPlan,
   type GymSocio,
+  type MetodoPago,
 } from "@/lib/gymCupoAdmin";
 import { hoyISOArgentina, sumarDiasISO } from "@/lib/tz";
 import { normalizeArPhone } from "@/lib/phone";
@@ -976,6 +980,24 @@ function fechaCorta(iso: string): string {
   }).format(new Date(`${iso}T12:00:00Z`));
 }
 
+// Métodos de pago que se pueden anotar en el libro (más amplios que el débito
+// recurrente): el profe carga cómo pagó realmente cada uno.
+const METODOS_PAGO: { key: MetodoPago; label: string }[] = [
+  { key: "efectivo", label: "Efectivo" },
+  { key: "transferencia", label: "Transferencia" },
+  { key: "mercadopago", label: "MercadoPago" },
+  { key: "debito", label: "Débito" },
+  { key: "otro", label: "Otro" },
+];
+const metodoLabel = (m: MetodoPago) =>
+  METODOS_PAGO.find((x) => x.key === m)?.label ?? m;
+
+// 15000 -> "$15.000"
+function montoAR(n: number | null): string {
+  if (n == null) return "—";
+  return "$" + Number(n).toLocaleString("es-AR");
+}
+
 function Socios({ tenantId }: { tenantId: string }) {
   const sb = useMemo(() => createClient(), []);
   const [socios, setSocios] = useState<GymSocio[]>([]);
@@ -997,6 +1019,18 @@ function Socios({ tenantId }: { tenantId: string }) {
   // Edición inline del email por socio (necesario para MercadoPago).
   const [editEmailId, setEditEmailId] = useState<string | null>(null);
   const [emailVal, setEmailVal] = useState("");
+  // Registro de pagos (libro por socio): historial cargado y cuál está abierto.
+  const [pagosPorSocio, setPagosPorSocio] = useState<Record<string, GymPago[]>>({});
+  const [pagosAbierto, setPagosAbierto] = useState<string | null>(null);
+  const [cargandoPagos, setCargandoPagos] = useState(false);
+  // Formulario de pago manual: cuál socio está abierto y sus campos.
+  const [pagoManualId, setPagoManualId] = useState<string | null>(null);
+  const [pmMonto, setPmMonto] = useState("");
+  const [pmMetodo, setPmMetodo] = useState<MetodoPago>("efectivo");
+  const [pmFecha, setPmFecha] = useState("");
+  const [pmHasta, setPmHasta] = useState("");
+  const [pmNota, setPmNota] = useState("");
+  const [pmGuardando, setPmGuardando] = useState(false);
   // Generación masiva de links de acceso (para el padrón importado).
   const [bulkCargando, setBulkCargando] = useState(false);
   const [bulkTexto, setBulkTexto] = useState<string | null>(null);
@@ -1073,13 +1107,30 @@ function Socios({ tenantId }: { tenantId: string }) {
     cargar();
   }
 
+  // Refleja un pago en la tarjeta del socio y, si el historial está cargado,
+  // le agrega el asiento arriba de todo. Sin recargar la lista.
+  function aplicarPago(pago: GymPago) {
+    setSocios((prev) =>
+      prev.map((x) =>
+        x.id === pago.alumno_id
+          ? { ...x, es_socio: true, cuota_hasta: pago.cuota_hasta }
+          : x,
+      ),
+    );
+    setPagosPorSocio((prev) =>
+      prev[pago.alumno_id]
+        ? { ...prev, [pago.alumno_id]: [pago, ...prev[pago.alumno_id]] }
+        : prev,
+    );
+  }
+
   async function registrarPago(s: GymSocio) {
-    // Extiende un mes: desde su vencimiento si sigue vigente, o desde hoy.
+    // "+1 mes": extiende un mes y queda anotado en el libro (método = el débito
+    // recurrente del socio, o efectivo). Monto = el del plan si tiene.
     const hoy = hoyISOArgentina();
     const base = s.cuota_hasta && s.cuota_hasta > hoy ? s.cuota_hasta : hoy;
     const nuevaCuota = sumarMesISO(base);
-    // Optimista: actualizo la tarjeta en el momento, sin recargar la lista.
-    // Guardo el estado previo por si el guardado falla y hay que revertir.
+    // Optimista: actualizo la tarjeta en el momento; el RPC confirma la fecha.
     const previo = { es_socio: s.es_socio, cuota_hasta: s.cuota_hasta };
     setError(null);
     setSocios((prev) =>
@@ -1088,13 +1139,77 @@ function Socios({ tenantId }: { tenantId: string }) {
       ),
     );
     try {
-      await updateGymSocio(sb, s.id, { es_socio: true, cuota_hasta: nuevaCuota });
+      const metodo: MetodoPago =
+        s.metodo_pago === "mercadopago" ? "mercadopago" : "efectivo";
+      const pago = await registrarPagoGym(sb, {
+        alumnoId: s.id,
+        monto: s.plan?.precio ?? null,
+        metodo,
+      });
+      aplicarPago(pago);
     } catch (e) {
       // Revierto la tarjeta a como estaba y aviso.
       setSocios((prev) =>
         prev.map((x) => (x.id === s.id ? { ...x, ...previo } : x)),
       );
       setError(e instanceof Error ? e.message : "No se pudo registrar el pago.");
+    }
+  }
+
+  function abrirPagoManual(s: GymSocio) {
+    setError(null);
+    setPagoManualId(s.id);
+    setPmMonto(s.plan?.precio ? String(s.plan.precio) : "");
+    setPmMetodo(s.metodo_pago === "mercadopago" ? "mercadopago" : "efectivo");
+    setPmFecha(hoyISOArgentina());
+    // Sugerencia de vencimiento: +1 mes desde el vencimiento vigente / hoy.
+    const hoy = hoyISOArgentina();
+    const base = s.cuota_hasta && s.cuota_hasta > hoy ? s.cuota_hasta : hoy;
+    setPmHasta(sumarMesISO(base));
+    setPmNota("");
+  }
+
+  async function guardarPagoManual(s: GymSocio) {
+    setError(null);
+    const montoNum = pmMonto.trim() ? Number(pmMonto.replace(/\./g, "").trim()) : null;
+    if (montoNum != null && (Number.isNaN(montoNum) || montoNum < 0)) {
+      setError("Monto inválido.");
+      return;
+    }
+    setPmGuardando(true);
+    try {
+      const pago = await registrarPagoGym(sb, {
+        alumnoId: s.id,
+        monto: montoNum,
+        metodo: pmMetodo,
+        fecha: pmFecha || null,
+        cuotaHasta: pmHasta || null,
+        nota: pmNota.trim() || null,
+      });
+      aplicarPago(pago);
+      setPagoManualId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo registrar el pago.");
+    } finally {
+      setPmGuardando(false);
+    }
+  }
+
+  async function togglePagos(s: GymSocio) {
+    if (pagosAbierto === s.id) {
+      setPagosAbierto(null);
+      return;
+    }
+    setPagosAbierto(s.id);
+    if (pagosPorSocio[s.id]) return; // ya cargado
+    setCargandoPagos(true);
+    try {
+      const lista = await getPagosSocio(sb, s.id);
+      setPagosPorSocio((prev) => ({ ...prev, [s.id]: lista }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron cargar los pagos.");
+    } finally {
+      setCargandoPagos(false);
     }
   }
 
@@ -1425,6 +1540,20 @@ function Socios({ tenantId }: { tenantId: string }) {
                   >
                     Registrar pago (+1 mes)
                   </button>
+                  <button
+                    onClick={() =>
+                      pagoManualId === s.id ? setPagoManualId(null) : abrirPagoManual(s)
+                    }
+                    className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink hover:border-faint"
+                  >
+                    Pago manual
+                  </button>
+                  <button
+                    onClick={() => togglePagos(s)}
+                    className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-muted hover:border-faint hover:text-ink"
+                  >
+                    {pagosAbierto === s.id ? "Ocultar pagos" : "Ver pagos"}
+                  </button>
                   <div className="flex rounded-full bg-surface-2 p-0.5">
                     {(["efectivo", "mercadopago"] as const).map((m) => (
                       <button
@@ -1440,6 +1569,125 @@ function Socios({ tenantId }: { tenantId: string }) {
                     ))}
                   </div>
                 </div>
+
+                {/* Pago manual: monto/método/fecha/vencimiento a mano. Para
+                    quienes pagan distinto a lo que hay cargado en el sistema. */}
+                {pagoManualId === s.id && (
+                  <div className="mt-2 space-y-2 rounded-lg border border-line bg-surface-2 p-3">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+                        Monto
+                        <input
+                          value={pmMonto}
+                          onChange={(e) => setPmMonto(e.target.value)}
+                          inputMode="numeric"
+                          placeholder="$"
+                          className="w-28 rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+                        Método
+                        <select
+                          value={pmMetodo}
+                          onChange={(e) => setPmMetodo(e.target.value as MetodoPago)}
+                          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                        >
+                          {METODOS_PAGO.map((m) => (
+                            <option key={m.key} value={m.key}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+                        Fecha del pago
+                        <input
+                          type="date"
+                          value={pmFecha}
+                          onChange={(e) => setPmFecha(e.target.value)}
+                          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+                        Cuota paga hasta
+                        <input
+                          type="date"
+                          value={pmHasta}
+                          onChange={(e) => setPmHasta(e.target.value)}
+                          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                        />
+                      </label>
+                    </div>
+                    <input
+                      value={pmNota}
+                      onChange={(e) => setPmNota(e.target.value)}
+                      placeholder="Nota (opcional): ej. pagó 2 semanas, seña…"
+                      className="w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => guardarPagoManual(s)}
+                        disabled={pmGuardando}
+                        className="rounded-full bg-accent px-4 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+                      >
+                        {pmGuardando ? "Guardando…" : "Guardar pago"}
+                      </button>
+                      <button
+                        onClick={() => setPagoManualId(null)}
+                        className="text-[12px] font-semibold text-muted"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Registro de pagos del socio. */}
+                {pagosAbierto === s.id && (
+                  <div className="mt-2 rounded-lg border border-line bg-surface-2 p-3">
+                    <div className="mb-1.5 text-[12px] font-bold text-ink">
+                      Registro de pagos
+                    </div>
+                    {cargandoPagos && !pagosPorSocio[s.id] ? (
+                      <p className="text-[12px] text-muted">Cargando…</p>
+                    ) : (pagosPorSocio[s.id]?.length ?? 0) === 0 ? (
+                      <p className="text-[12px] text-muted">Todavía no hay pagos.</p>
+                    ) : (
+                      <ul className="divide-y divide-line">
+                        {pagosPorSocio[s.id]?.map((p) => (
+                          <li
+                            key={p.id}
+                            className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-1.5"
+                          >
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-[13px] font-semibold text-ink">
+                                {fechaCorta(p.fecha)}
+                              </span>
+                              <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-bold text-muted">
+                                {metodoLabel(p.metodo)}
+                              </span>
+                              {p.nota && (
+                                <span className="text-[11px] text-muted">{p.nota}</span>
+                              )}
+                            </div>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-[13px] font-bold text-ink">
+                                {montoAR(p.monto)}
+                              </span>
+                              {p.cuota_hasta && (
+                                <span className="text-[11px] text-muted">
+                                  → {fechaCorta(p.cuota_hasta)}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 {s.metodo_pago === "mercadopago" && (
                   <div className="mt-2 border-t border-line pt-2">
                     {s.mp_estado === "authorized" ? (

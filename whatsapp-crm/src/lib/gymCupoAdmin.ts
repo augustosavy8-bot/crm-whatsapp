@@ -157,6 +157,67 @@ export async function updateGymSocio(
   if (error) throw error;
 }
 
+// --- Pagos (libro por socio) ---
+
+export type MetodoPago =
+  | "efectivo"
+  | "transferencia"
+  | "mercadopago"
+  | "debito"
+  | "otro";
+
+export interface GymPago {
+  id: string;
+  alumno_id: string;
+  fecha: string; // YYYY-MM-DD
+  monto: number | null;
+  metodo: MetodoPago;
+  nota: string | null;
+  cuota_hasta: string | null; // a qué fecha quedó la cuota tras este pago
+  created_at: string;
+}
+
+// Registra un pago Y actualiza la cuota del socio en una sola transacción
+// (RPC security definer). Devuelve el asiento creado, con la cuota_hasta ya
+// resuelta por el servidor. cuotaHasta null => "+1 mes" desde el vencimiento.
+export async function registrarPagoGym(
+  sb: SupabaseClient,
+  args: {
+    alumnoId: string;
+    monto?: number | null;
+    metodo?: MetodoPago;
+    fecha?: string | null; // YYYY-MM-DD
+    cuotaHasta?: string | null; // YYYY-MM-DD; null => +1 mes
+    nota?: string | null;
+  },
+): Promise<GymPago> {
+  const { data, error } = await sb.rpc("gym_registrar_pago", {
+    p_alumno_id: args.alumnoId,
+    p_monto: args.monto ?? null,
+    p_metodo: args.metodo ?? "efectivo",
+    p_fecha: args.fecha ?? null,
+    p_cuota_hasta: args.cuotaHasta ?? null,
+    p_nota: args.nota ?? null,
+  });
+  if (error) throw error;
+  return data as GymPago;
+}
+
+// Historial de pagos de un socio (el más reciente primero).
+export async function getPagosSocio(
+  sb: SupabaseClient,
+  alumnoId: string,
+): Promise<GymPago[]> {
+  const { data, error } = await sb
+    .from("gym_pagos")
+    .select("id, alumno_id, fecha, monto, metodo, nota, cuota_hasta, created_at")
+    .eq("alumno_id", alumnoId)
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as GymPago[];
+}
+
 // --- Planes ---
 
 export async function getPlanes(sb: SupabaseClient): Promise<GymPlan[]> {
