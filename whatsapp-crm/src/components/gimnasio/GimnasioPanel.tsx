@@ -28,6 +28,7 @@ import {
   type MetodoPago,
 } from "@/lib/gymCupoAdmin";
 import { hoyISOArgentina, sumarDiasISO } from "@/lib/tz";
+import { cuotaProporcional, proximoVencimientoISO } from "@/lib/gymCuota";
 import { normalizeArPhone } from "@/lib/phone";
 import { appBaseUrl } from "@/lib/appUrl";
 
@@ -1062,12 +1063,6 @@ function Horarios({ tenantId }: { tenantId: string }) {
 // ------------------------------------------------------------
 // Tab Socios: padrón + estado de cuota
 // ------------------------------------------------------------
-function sumarMesISO(iso: string): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 function fechaCorta(iso: string): string {
   return new Intl.DateTimeFormat("es-AR", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -1254,11 +1249,16 @@ function Socios({ tenantId }: { tenantId: string }) {
   }
 
   async function registrarPago(s: GymSocio) {
-    // "+1 mes": extiende un mes y queda anotado en el libro (método = el débito
-    // recurrente del socio, o efectivo). Monto = el del plan si tiene.
+    // Registra el pago y deja la cuota paga hasta el 10 del mes que viene
+    // (nunca el día en que pagó). Si el socio es nuevo (nunca pagó) y tiene
+    // plan, el primer pago es proporcional a los días que quedan del mes.
     const hoy = hoyISOArgentina();
-    const base = s.cuota_hasta && s.cuota_hasta > hoy ? s.cuota_hasta : hoy;
-    const nuevaCuota = sumarMesISO(base);
+    const nuevaCuota = proximoVencimientoISO(s.cuota_hasta, hoy);
+    const esNuevo = !s.cuota_hasta;
+    const monto =
+      esNuevo && s.plan
+        ? cuotaProporcional(s.plan.precio, hoy).monto
+        : (s.plan?.precio ?? null);
     // Optimista: actualizo la tarjeta en el momento; el RPC confirma la fecha.
     const previo = { es_socio: s.es_socio, cuota_hasta: s.cuota_hasta };
     setError(null);
@@ -1272,8 +1272,9 @@ function Socios({ tenantId }: { tenantId: string }) {
         s.metodo_pago === "mercadopago" ? "mercadopago" : "efectivo";
       const pago = await registrarPagoGym(sb, {
         alumnoId: s.id,
-        monto: s.plan?.precio ?? null,
+        monto,
         metodo,
+        cuotaHasta: nuevaCuota,
       });
       aplicarPago(pago);
     } catch (e) {
@@ -1288,13 +1289,19 @@ function Socios({ tenantId }: { tenantId: string }) {
   function abrirPagoManual(s: GymSocio) {
     setError(null);
     setPagoManualId(s.id);
-    setPmMonto(s.plan?.precio ? String(s.plan.precio) : "");
-    setPmMetodo(s.metodo_pago === "mercadopago" ? "mercadopago" : "efectivo");
-    setPmFecha(hoyISOArgentina());
-    // Sugerencia de vencimiento: +1 mes desde el vencimiento vigente / hoy.
     const hoy = hoyISOArgentina();
-    const base = s.cuota_hasta && s.cuota_hasta > hoy ? s.cuota_hasta : hoy;
-    setPmHasta(sumarMesISO(base));
+    // Nuevo socio con plan: sugiere el proporcional del mes. Si no, la cuota
+    // completa del plan.
+    const esNuevo = !s.cuota_hasta;
+    const sugerido =
+      esNuevo && s.plan
+        ? cuotaProporcional(s.plan.precio, hoy).monto
+        : (s.plan?.precio ?? null);
+    setPmMonto(sugerido ? String(sugerido) : "");
+    setPmMetodo(s.metodo_pago === "mercadopago" ? "mercadopago" : "efectivo");
+    setPmFecha(hoy);
+    // Vencimiento sugerido: el 10 del mes que viene.
+    setPmHasta(proximoVencimientoISO(s.cuota_hasta, hoy));
     setPmNota("");
   }
 
@@ -1589,6 +1596,11 @@ function Socios({ tenantId }: { tenantId: string }) {
             const vencida = cuotaVencida(s.es_socio, s.cuota_hasta);
             const mesesDebe = deuda[s.id];
             const saldoPesos = deudaPesos(mesesDebe, s.plan);
+            const hoyISO = hoyISOArgentina();
+            // Nuevo (nunca pagó): el 1er pago es proporcional al mes en curso.
+            const esNuevo = !s.cuota_hasta;
+            const prop =
+              esNuevo && s.plan ? cuotaProporcional(s.plan.precio, hoyISO) : null;
             return (
               <div
                 key={s.id}
@@ -1731,9 +1743,16 @@ function Socios({ tenantId }: { tenantId: string }) {
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => registrarPago(s)}
+                    title={
+                      prop
+                        ? `1er pago proporcional: ${prop.diasRestantes} de ${prop.diasMes} días`
+                        : "Registra el pago; la cuota vence el 10 del mes que viene"
+                    }
                     className="rounded-full bg-accent px-3 py-1.5 text-[12px] font-bold text-white hover:brightness-95"
                   >
-                    Registrar pago (+1 mes)
+                    {prop
+                      ? `Registrar 1er pago · ${montoAR(prop.monto)}`
+                      : "Registrar pago"}
                   </button>
                   <button
                     onClick={() =>
@@ -1795,6 +1814,29 @@ function Socios({ tenantId }: { tenantId: string }) {
                         </select>
                       </label>
                     </div>
+                    {/* Atajos de monto: proporcional (si arranca ahora) o cuota
+                        completa del plan. */}
+                    {s.plan && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        {prop && (
+                          <button
+                            type="button"
+                            onClick={() => setPmMonto(String(prop.monto))}
+                            className="rounded-full bg-accent-soft px-2.5 py-1 font-bold text-accent"
+                          >
+                            Proporcional {montoAR(prop.monto)} · {prop.diasRestantes}/
+                            {prop.diasMes} días
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setPmMonto(String(s.plan!.precio))}
+                          className="rounded-full bg-surface px-2.5 py-1 font-semibold text-muted hover:text-ink"
+                        >
+                          Cuota completa {montoAR(s.plan.precio)}
+                        </button>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
                         Fecha del pago

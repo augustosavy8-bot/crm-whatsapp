@@ -7,9 +7,10 @@ import {
   verificarFirmaWebhook,
 } from "@/lib/mercadopago";
 import { hoyISOArgentina } from "@/lib/tz";
+import { proximoVencimientoISO } from "@/lib/gymCuota";
 
 // Webhook de MercadoPago: MP nos avisa de cada cobro / cambio de suscripción.
-// - payment approved  -> renueva la cuota del socio (+1 mes).
+// - payment approved  -> renueva la cuota del socio (vence el 10 del mes que viene).
 // - preapproval       -> espeja el estado (authorized/paused/cancelled).
 // Público (lo llama MP), fuera del proxy de sesión (está bajo /api).
 //
@@ -18,13 +19,6 @@ import { hoyISOArgentina } from "@/lib/tz";
 // nombre exacto de los `type`. Está armado según la doc; ajustar al probar.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// Suma un mes a "YYYY-MM-DD" (vía mediodía UTC, estable ante DST).
-function sumarMesISO(iso: string): string {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  return d.toISOString().slice(0, 10);
-}
 
 export async function POST(request: NextRequest) {
   const url = new URL(request.url);
@@ -88,7 +82,8 @@ export async function POST(request: NextRequest) {
           if (al && al.mp_last_payment_id !== dataId) {
             const hoy = hoyISOArgentina();
             const actual = al.cuota_hasta as string | null;
-            const base = actual && actual > hoy ? actual : hoy;
+            // Vencimiento siempre el 10 del mes que viene (regla única de cuota).
+            const nuevaCuota = proximoVencimientoISO(actual, hoy);
             // Un pago con `preapproval_id` viene de la SUSCRIPCIÓN (débito
             // automático); uno sin él es un pago ÚNICO (Checkout Pro). Solo el
             // primero marca al socio como adherido al débito — si no, un pago
@@ -98,7 +93,7 @@ export async function POST(request: NextRequest) {
               .from("gym_alumnos")
               .update({
                 es_socio: true,
-                cuota_hasta: sumarMesISO(base),
+                cuota_hasta: nuevaCuota,
                 mp_last_payment_id: dataId,
                 ...(esSuscripcion
                   ? { metodo_pago: "mercadopago", mp_estado: "authorized" }
