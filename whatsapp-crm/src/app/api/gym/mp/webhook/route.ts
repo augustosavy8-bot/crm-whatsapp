@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         if (alumnoId) {
           const { data: al } = await sb
             .from("gym_alumnos")
-            .select("id, cuota_hasta, mp_last_payment_id")
+            .select("id, tenant_id, cuota_hasta, mp_last_payment_id")
             .eq("id", alumnoId)
             .maybeSingle();
           // Idempotencia: si ya procesamos ESTE payment, no volver a extender
@@ -100,6 +100,18 @@ export async function POST(request: NextRequest) {
                   : {}),
               })
               .eq("id", alumnoId);
+
+            // Deja el cobro anotado en el libro de pagos del socio, igual que un
+            // pago cargado a mano. Best-effort: si falla, no rompe el webhook.
+            await sb.from("gym_pagos").insert({
+              tenant_id: al.tenant_id,
+              alumno_id: alumnoId,
+              fecha: hoy,
+              monto: typeof pago.transaction_amount === "number" ? pago.transaction_amount : null,
+              metodo: "mercadopago",
+              nota: esSuscripcion ? "Débito automático" : "Pago con MercadoPago",
+              cuota_hasta: nuevaCuota,
+            });
           }
         }
       }

@@ -14,6 +14,11 @@ export async function GET() {
   if (!alumno) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
+  // Sin WhatsApp cargado todavía no hay reservas posibles (el cupo se maneja
+  // por teléfono). Devolvemos vacío en vez de romper.
+  if (!alumno.telefono) {
+    return NextResponse.json({ reservas: [] });
+  }
 
   const reservas = await getMisReservas(alumno.telefono);
   return NextResponse.json({ reservas });

@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
   if (!alumno) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
+  if (!alumno.telefono) {
+    return NextResponse.json({ error: "Completá tu WhatsApp en tu cuenta." }, { status: 400 });
+  }
 
   let body: Payload;
   try {

@@ -156,6 +156,7 @@ export interface MpPayment {
   external_reference?: string;
   metadata?: Record<string, unknown>;
   preapproval_id?: string;
+  transaction_amount?: number; // monto cobrado, para el libro de pagos
 }
 
 export async function getPayment(id: string): Promise<MpPayment> {

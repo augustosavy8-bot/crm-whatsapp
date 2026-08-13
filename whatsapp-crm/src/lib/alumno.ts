@@ -4,7 +4,7 @@ export interface CurrentAlumno {
   id: string;
   tenant_id: string;
   nombre: string;
-  telefono: string;
+  telefono: string | null; // los socios del padrón importado pueden no tenerlo
   email: string | null;
   es_socio: boolean;
   cuota_hasta: string | null; // YYYY-MM-DD

@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
   if (!alumno) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
+  if (!alumno.telefono) {
+    return NextResponse.json(
+      { error: "Completá tu WhatsApp en tu cuenta para poder reservar." },
+      { status: 400 },
+    );
+  }
 
   // Para reservar hay que estar al día (con la gracia del 1 al 20).
   if (reservaBloqueadaPorDeuda(alumno.cuota_hasta)) {

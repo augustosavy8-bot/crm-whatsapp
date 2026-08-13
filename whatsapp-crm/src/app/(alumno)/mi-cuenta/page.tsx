@@ -6,6 +6,7 @@ import { getGymContext } from "@/lib/gym";
 import { hoyISOArgentina } from "@/lib/tz";
 import { cuotaPorVencer, debitoActivo } from "@/lib/gymCuota";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
+import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import CuotaAcciones from "@/components/gimnasio/CuotaAcciones";
 import InstruccionesInstalar from "@/components/gimnasio/InstruccionesInstalar";
 
@@ -98,10 +99,14 @@ export default async function MiCuentaPage() {
         tieneEmail={Boolean(alumno.email)}
       />
 
-      <ClasesFlow
-        gimnasioNombre={gym?.nombre ?? "KINACTIVA"}
-        sesion={{ nombre: alumno.nombre, telefono: alumno.telefono }}
-      />
+      {alumno.telefono ? (
+        <ClasesFlow
+          gimnasioNombre={gym?.nombre ?? "KINACTIVA"}
+          sesion={{ nombre: alumno.nombre, telefono: alumno.telefono }}
+        />
+      ) : (
+        <CompletarTelefono />
+      )}
 
       <InstruccionesInstalar />
     </main>
