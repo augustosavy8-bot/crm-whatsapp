@@ -10,9 +10,11 @@ import { createClient } from "@/lib/supabase/client";
 export default function RegistroStaffForm({
   token,
   nombre,
+  esAdmin = true,
 }: {
   token: string;
   nombre: string | null;
+  esAdmin?: boolean;
 }) {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -58,7 +60,9 @@ export default function RegistroStaffForm({
           {nombre ? `Creá tu cuenta, ${nombre.split(" ")[0]}` : "Creá tu cuenta"}
         </h2>
         <p className="mt-0.5 text-xs text-muted">
-          Profesor + administrador del gimnasio. Definí tu email y contraseña.
+          {esAdmin
+            ? "Profesor + administrador del gimnasio. Definí tu email y contraseña."
+            : "Profesor del gimnasio. Definí tu email y contraseña."}
         </p>
       </div>
 

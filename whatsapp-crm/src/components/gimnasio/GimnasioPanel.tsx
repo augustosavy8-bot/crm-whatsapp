@@ -6,15 +6,20 @@ import { createClient } from "@/lib/supabase/client";
 import { Toast } from "@/components/turnos/Toast";
 import {
   crearGymHorario,
+  getAsistencias,
+  getDeudaResumen,
   getGymAlumnos,
   getGymHorarios,
   getGymOcupacion,
   getPagosSocio,
   getPlanes,
+  marcarAsistencia,
   registrarPagoGym,
   setGymHorarioActivo,
   updateGymSocio,
+  type AsistenciaEstado,
   type GymAlumnoEnClase,
+  type GymCuotaAdeudada,
   type GymHorario,
   type GymOcupacionHorario,
   type GymPago,
@@ -66,19 +71,33 @@ function planLabel(p: Pick<GymPlan, "nombre" | "precio" | "dias_semana">): strin
   return `${p.nombre} · ${precioAR(p.precio)}`;
 }
 
-export default function GimnasioPanel({ tenantId }: { tenantId: string }) {
+export default function GimnasioPanel({
+  tenantId,
+  puedeCobros = true,
+}: {
+  tenantId: string;
+  // Acceso a cobros (socios y planes). Un profe "solo agenda" (sin gym_admin)
+  // ve la agenda y los horarios, pero no los pagos ni los precios.
+  puedeCobros?: boolean;
+}) {
   const [tab, setTab] = useState<Tab>("agenda");
+
+  // Un profe sin cobros no ve las pestañas de plata.
+  const tabs = TABS.filter(
+    (t) => puedeCobros || (t.key !== "socios" && t.key !== "planes"),
+  );
+  const tabActual = tabs.some((t) => t.key === tab) ? tab : "agenda";
 
   return (
     <div className="space-y-4">
       <div className="flex rounded-full bg-surface-2 p-1">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={[
               "flex-1 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-              tab === t.key ? "bg-ink text-white" : "text-muted hover:text-ink",
+              tabActual === t.key ? "bg-ink text-white" : "text-muted hover:text-ink",
             ].join(" ")}
           >
             {t.label}
@@ -86,10 +105,10 @@ export default function GimnasioPanel({ tenantId }: { tenantId: string }) {
         ))}
       </div>
 
-      {tab === "agenda" && <Agenda />}
-      {tab === "socios" && <Socios tenantId={tenantId} />}
-      {tab === "planes" && <Planes />}
-      {tab === "horarios" && <Horarios tenantId={tenantId} />}
+      {tabActual === "agenda" && <Agenda tenantId={tenantId} />}
+      {tabActual === "socios" && puedeCobros && <Socios tenantId={tenantId} />}
+      {tabActual === "planes" && puedeCobros && <Planes />}
+      {tabActual === "horarios" && <Horarios tenantId={tenantId} />}
     </div>
   );
 }
@@ -322,7 +341,7 @@ function cuotaVencida(esSocio: boolean, cuotaHasta: string | null): boolean {
 // ------------------------------------------------------------
 // Tab Agenda: ocupación por día
 // ------------------------------------------------------------
-function Agenda() {
+function Agenda({ tenantId }: { tenantId: string }) {
   const sb = useMemo(() => createClient(), []);
   const [fecha, setFecha] = useState(hoyISOArgentina);
   const [data, setData] = useState<GymOcupacionHorario[]>([]);
@@ -331,12 +350,19 @@ function Agenda() {
   const [agregarA, setAgregarA] = useState<string | null>(null); // horario_id
   const [novedad, setNovedad] = useState(false); // campana con aviso
   const [aviso, setAviso] = useState<string | null>(null); // toast realtime
+  // Asistencia del día: clave `${alumnoId}|${horarioId}` -> presente/ausente.
+  const [asist, setAsist] = useState<Record<string, AsistenciaEstado>>({});
 
   const cargar = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      setData(await getGymOcupacion(sb, fecha));
+      const [ocup, asis] = await Promise.all([
+        getGymOcupacion(sb, fecha),
+        getAsistencias(sb, fecha),
+      ]);
+      setData(ocup);
+      setAsist(asis);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la agenda.");
       setData([]);
@@ -344,6 +370,52 @@ function Agenda() {
       setCargando(false);
     }
   }, [sb, fecha]);
+
+  // Marca presente/ausente (toggle: volver a tocar el mismo estado lo quita).
+  async function marcar(
+    alumnoId: string,
+    horarioId: string,
+    estado: AsistenciaEstado,
+  ) {
+    const key = `${alumnoId}|${horarioId}`;
+    const previo = asist[key];
+    const nuevo = previo === estado ? undefined : estado;
+    setAsist((prev) => {
+      const copia = { ...prev };
+      if (nuevo) copia[key] = nuevo;
+      else delete copia[key];
+      return copia;
+    });
+    try {
+      if (nuevo) {
+        await marcarAsistencia(sb, {
+          tenantId,
+          alumnoId,
+          horarioId,
+          fecha,
+          estado: nuevo,
+        });
+      } else {
+        // Se "destildó": borro el registro (queda sin marcar).
+        const { error } = await sb
+          .from("gym_asistencias")
+          .delete()
+          .eq("alumno_id", alumnoId)
+          .eq("horario_id", horarioId)
+          .eq("fecha", fecha);
+        if (error) throw error;
+      }
+    } catch (e) {
+      // Revierto.
+      setAsist((prev) => {
+        const copia = { ...prev };
+        if (previo) copia[key] = previo;
+        else delete copia[key];
+        return copia;
+      });
+      setError(e instanceof Error ? e.message : "No se pudo marcar la asistencia.");
+    }
+  }
 
   useEffect(() => {
     cargar();
@@ -584,6 +656,31 @@ function Agenda() {
                           {vencida && (
                             <span className="rounded-full bg-danger/15 px-2 py-0.5 text-[10px] font-bold uppercase text-danger">
                               {a.es_socio ? "Cuota vencida" : "No socio"}
+                            </span>
+                          )}
+                          {/* Asistencia: presente / ausente (solo confirmados). */}
+                          {!pendiente && (
+                            <span className="flex overflow-hidden rounded-full border border-line">
+                              {(["presente", "ausente"] as const).map((es) => {
+                                const activo =
+                                  asist[`${a.alumno_id}|${h.horario_id}`] === es;
+                                return (
+                                  <button
+                                    key={es}
+                                    onClick={() => marcar(a.alumno_id, h.horario_id, es)}
+                                    className={[
+                                      "px-2 py-0.5 text-[10px] font-bold uppercase transition-colors",
+                                      activo
+                                        ? es === "presente"
+                                          ? "bg-ok text-white"
+                                          : "bg-danger text-white"
+                                        : "text-muted hover:text-ink",
+                                    ].join(" ")}
+                                  >
+                                    {es === "presente" ? "Presente" : "Ausente"}
+                                  </button>
+                                );
+                              })}
                             </span>
                           )}
                         </div>
@@ -998,6 +1095,24 @@ function montoAR(n: number | null): string {
   return "$" + Number(n).toLocaleString("es-AR");
 }
 
+const MESES = [
+  "ene", "feb", "mar", "abr", "may", "jun",
+  "jul", "ago", "sep", "oct", "nov", "dic",
+];
+const mesLabel = (anio: number, mes: number) =>
+  `${MESES[mes - 1] ?? mes} ${anio}`;
+
+// Deuda estimada en pesos: meses adeudados × precio del plan del socio. El
+// monto real no está cargado mes a mes (viene de la planilla), así que es una
+// estimación con el plan actual — por eso se muestra con "≈".
+function deudaPesos(
+  meses: GymCuotaAdeudada[] | undefined,
+  plan: GymSocio["plan"],
+): number | null {
+  if (!meses?.length || !plan) return null;
+  return meses.length * plan.precio;
+}
+
 function Socios({ tenantId }: { tenantId: string }) {
   const sb = useMemo(() => createClient(), []);
   const [socios, setSocios] = useState<GymSocio[]>([]);
@@ -1034,14 +1149,22 @@ function Socios({ tenantId }: { tenantId: string }) {
   // Generación masiva de links de acceso (para el padrón importado).
   const [bulkCargando, setBulkCargando] = useState(false);
   const [bulkTexto, setBulkTexto] = useState<string | null>(null);
+  // Deuda: meses adeudados por socio (planilla de cuotas), y cuál está abierto.
+  const [deuda, setDeuda] = useState<Record<string, GymCuotaAdeudada[]>>({});
+  const [saldoAbierto, setSaldoAbierto] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      const [s, p] = await Promise.all([getGymAlumnos(sb), getPlanes(sb)]);
+      const [s, p, d] = await Promise.all([
+        getGymAlumnos(sb),
+        getPlanes(sb),
+        getDeudaResumen(sb),
+      ]);
       setSocios(s);
       setPlanes(p);
+      setDeuda(d);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar.");
     } finally {
@@ -1080,14 +1203,20 @@ function Socios({ tenantId }: { tenantId: string }) {
 
   async function alta() {
     setError(null);
-    if (!nombre.trim() || !telefono.trim()) {
-      setError("Nombre y WhatsApp obligatorios.");
+    if (!nombre.trim()) {
+      setError("El nombre es obligatorio.");
       return;
     }
-    const tel = normalizeArPhone(telefono.trim());
-    if (tel.length < 10) {
-      setError("WhatsApp inválido.");
-      return;
+    // El WhatsApp es OPCIONAL: de muchos socios no se tiene. Si lo cargan, se
+    // valida; si no, la ficha queda sin teléfono y se le manda link de acceso
+    // para que el propio socio lo complete al crear su cuenta.
+    let tel: string | null = null;
+    if (telefono.trim()) {
+      tel = normalizeArPhone(telefono.trim());
+      if (tel.length < 10) {
+        setError("WhatsApp inválido.");
+        return;
+      }
     }
     setGuardando(true);
     const { error } = await sb
@@ -1345,6 +1474,13 @@ function Socios({ tenantId }: { tenantId: string }) {
       (s.telefono ?? "").includes(q),
   );
 
+  // Resumen de deuda del padrón (cabecera).
+  const sociosConDeuda = socios.filter((s) => (deuda[s.id]?.length ?? 0) > 0);
+  const totalDeudaPesos = sociosConDeuda.reduce(
+    (acc, s) => acc + (deudaPesos(deuda[s.id], s.plan) ?? 0),
+    0,
+  );
+
   const input =
     "rounded-lg border border-line bg-surface-2 px-3 py-2 text-[14px] text-ink outline-none focus:border-accent";
 
@@ -1363,7 +1499,7 @@ function Socios({ tenantId }: { tenantId: string }) {
           <input
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
-            placeholder="WhatsApp"
+            placeholder="WhatsApp (opcional)"
             inputMode="tel"
             className={`${input} min-w-0 flex-1`}
           />
@@ -1375,6 +1511,10 @@ function Socios({ tenantId }: { tenantId: string }) {
             {guardando ? "…" : "Agregar"}
           </button>
         </div>
+        <p className="text-[11px] text-faint">
+          Si no tenés el WhatsApp, dejalo vacío: podés mandarle igual el link de
+          acceso y lo completa el socio al crear su cuenta.
+        </p>
       </div>
 
       {/* Invitación masiva: un link de acceso por cada socio sin cuenta. */}
@@ -1411,6 +1551,21 @@ function Socios({ tenantId }: { tenantId: string }) {
         )}
       </div>
 
+      {/* Resumen de deuda del padrón. */}
+      {sociosConDeuda.length > 0 && (
+        <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-panel border border-danger/30 bg-danger/5 px-4 py-3">
+          <span className="text-[13px] font-bold text-danger">
+            {sociosConDeuda.length} socio{sociosConDeuda.length === 1 ? "" : "s"} con
+            deuda
+          </span>
+          {totalDeudaPesos > 0 && (
+            <span className="text-[13px] font-semibold text-danger">
+              Total ≈ {montoAR(totalDeudaPesos)}
+            </span>
+          )}
+        </div>
+      )}
+
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -1432,6 +1587,8 @@ function Socios({ tenantId }: { tenantId: string }) {
         <div className="space-y-2">
           {filtrados.map((s) => {
             const vencida = cuotaVencida(s.es_socio, s.cuota_hasta);
+            const mesesDebe = deuda[s.id];
+            const saldoPesos = deudaPesos(mesesDebe, s.plan);
             return (
               <div
                 key={s.id}
@@ -1461,6 +1618,44 @@ function Socios({ tenantId }: { tenantId: string }) {
                         : "No socio"}
                   </span>
                 </div>
+
+                {/* Saldo: si debe meses, chip que abre el detalle exacto. */}
+                {mesesDebe && mesesDebe.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() =>
+                        setSaldoAbierto((cur) => (cur === s.id ? null : s.id))
+                      }
+                      className="flex items-center gap-2 rounded-full bg-danger/10 px-3 py-1.5 text-[12px] font-bold text-danger hover:bg-danger/15"
+                    >
+                      <span>
+                        Debe {mesesDebe.length} mes{mesesDebe.length === 1 ? "" : "es"}
+                        {saldoPesos ? ` ≈ ${montoAR(saldoPesos)}` : ""}
+                      </span>
+                      <span className="text-[10px]">
+                        {saldoAbierto === s.id ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {saldoAbierto === s.id && (
+                      <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                        {mesesDebe.map((m) => (
+                          <li
+                            key={`${m.anio}-${m.mes}`}
+                            className={[
+                              "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                              m.estado === "parcial"
+                                ? "bg-warn/15 text-warn"
+                                : "bg-danger/15 text-danger",
+                            ].join(" ")}
+                          >
+                            {mesLabel(m.anio, m.mes)}
+                            {m.estado === "parcial" ? " · parcial" : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
 
                 {/* Plan (define el precio de la cuota / débito automático) */}
                 <div className="mt-2 flex flex-wrap items-center gap-2">

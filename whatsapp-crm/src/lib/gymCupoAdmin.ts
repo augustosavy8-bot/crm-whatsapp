@@ -218,6 +218,89 @@ export async function getPagosSocio(
   return (data ?? []) as GymPago[];
 }
 
+// --- Deuda (cuotas mensuales adeudadas) ---
+
+export interface GymCuotaAdeudada {
+  anio: number;
+  mes: number;
+  estado: "debe" | "parcial";
+}
+
+// Meses adeudados (estado 'debe' o 'parcial') de TODOS los socios, agrupados
+// por alumno. Es la "planilla" de deuda: qué meses quedaron sin pagar. Liviano
+// (solo trae lo adeudado, no toda la grilla).
+export async function getDeudaResumen(
+  sb: SupabaseClient,
+): Promise<Record<string, GymCuotaAdeudada[]>> {
+  const { data, error } = await sb
+    .from("gym_cuotas")
+    .select("alumno_id, anio, mes, estado")
+    .in("estado", ["debe", "parcial"])
+    .order("anio", { ascending: true })
+    .order("mes", { ascending: true });
+  if (error) throw error;
+  const out: Record<string, GymCuotaAdeudada[]> = {};
+  for (const r of (data ?? []) as {
+    alumno_id: string;
+    anio: number;
+    mes: number;
+    estado: "debe" | "parcial";
+  }[]) {
+    (out[r.alumno_id] ??= []).push({ anio: r.anio, mes: r.mes, estado: r.estado });
+  }
+  return out;
+}
+
+// --- Asistencia (presente / ausente por clase y día) ---
+
+export type AsistenciaEstado = "presente" | "ausente";
+
+// Asistencias marcadas para una fecha. Clave: `${alumnoId}|${horarioId}`.
+export async function getAsistencias(
+  sb: SupabaseClient,
+  fecha: string,
+): Promise<Record<string, AsistenciaEstado>> {
+  const { data, error } = await sb
+    .from("gym_asistencias")
+    .select("alumno_id, horario_id, estado")
+    .eq("fecha", fecha);
+  if (error) throw error;
+  const out: Record<string, AsistenciaEstado> = {};
+  for (const r of (data ?? []) as {
+    alumno_id: string;
+    horario_id: string;
+    estado: AsistenciaEstado;
+  }[]) {
+    out[`${r.alumno_id}|${r.horario_id}`] = r.estado;
+  }
+  return out;
+}
+
+// Marca (o cambia) la asistencia de un alumno a una clase en una fecha.
+export async function marcarAsistencia(
+  sb: SupabaseClient,
+  args: {
+    tenantId: string;
+    alumnoId: string;
+    horarioId: string;
+    fecha: string;
+    estado: AsistenciaEstado;
+  },
+): Promise<void> {
+  const { error } = await sb.from("gym_asistencias").upsert(
+    {
+      tenant_id: args.tenantId,
+      alumno_id: args.alumnoId,
+      horario_id: args.horarioId,
+      fecha: args.fecha,
+      estado: args.estado,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "alumno_id,horario_id,fecha" },
+  );
+  if (error) throw error;
+}
+
 // --- Planes ---
 
 export async function getPlanes(sb: SupabaseClient): Promise<GymPlan[]> {

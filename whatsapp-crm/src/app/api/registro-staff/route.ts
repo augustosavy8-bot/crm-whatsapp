@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   // Token válido, no vencido, y la ficha todavía sin login.
   const { data: agent } = await sb
     .from("agents")
-    .select("id, auth_user_id, invite_expires_at, tenant_id, name")
+    .select("id, auth_user_id, invite_expires_at, tenant_id, name, gym_admin")
     .eq("invite_token", token)
     .maybeSingle();
 
@@ -84,14 +84,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Sella el vínculo y los permisos (profesor + admin del gym), y consume el
-  // token. auth_user_id ya lo dejó el trigger; se re-afirma por las dudas.
+  // Sella el vínculo y los permisos, y consume el token. El rol es profesor;
+  // que sea admin (acceso a cobros) depende de cómo se creó la invitación:
+  // un profe "solo agenda" se invita con gym_admin=false. auth_user_id ya lo
+  // dejó el trigger; se re-afirma por las dudas.
+  const esAdmin = agent.gym_admin === true;
   const { error: linkErr } = await sb
     .from("agents")
     .update({
       auth_user_id: created.user.id,
       role: "profesional",
-      gym_admin: true,
+      gym_admin: esAdmin,
       invite_token: null,
       invite_expires_at: null,
     })
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest) {
   if (agent.tenant_id) {
     await notificarNuevoUsuario(
       agent.tenant_id as string,
-      `${agent.name ?? "Un profesor"} (profesor/admin) creó su cuenta: ${email}`,
+      `${agent.name ?? "Un profesor"} (${esAdmin ? "profesor/admin" : "profesor"}) creó su cuenta: ${email}`,
     ).catch(() => {});
   }
 

@@ -26,7 +26,10 @@ export default async function GymPanelPage() {
           {/* Push: avisa cuando un alumno se anota, para confirmar. */}
           <PushButton />
         </header>
-        <GimnasioPanel tenantId={agent.tenant_id} />
+        <GimnasioPanel
+          tenantId={agent.tenant_id}
+          puedeCobros={agent.role === "owner" || agent.gym_admin}
+        />
       </div>
     </div>
   );

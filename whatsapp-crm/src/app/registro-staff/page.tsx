@@ -13,7 +13,7 @@ export default async function RegistroStaffPage({
 }) {
   const { token } = await searchParams;
 
-  let agente: { nombre: string | null } | null = null;
+  let agente: { nombre: string | null; esAdmin: boolean } | null = null;
   let motivo = "";
 
   if (!token) {
@@ -22,7 +22,7 @@ export default async function RegistroStaffPage({
     const sb = createServiceClient();
     const { data } = await sb
       .from("agents")
-      .select("name, auth_user_id, invite_expires_at")
+      .select("name, auth_user_id, invite_expires_at, gym_admin")
       .eq("invite_token", token)
       .maybeSingle();
 
@@ -36,7 +36,7 @@ export default async function RegistroStaffPage({
     } else if (vencida) {
       motivo = "La invitación venció. Pedí una nueva.";
     } else {
-      agente = { nombre: data.name };
+      agente = { nombre: data.name, esAdmin: data.gym_admin === true };
     }
   }
 
@@ -53,7 +53,7 @@ export default async function RegistroStaffPage({
         </div>
 
         {agente && token ? (
-          <RegistroStaffForm token={token} nombre={agente.nombre} />
+          <RegistroStaffForm token={token} nombre={agente.nombre} esAdmin={agente.esAdmin} />
         ) : (
           <div className="space-y-3 rounded-panel border border-line bg-surface p-6 text-center shadow-card">
             <h2 className="text-[15px] font-semibold">Invitación no válida</h2>
