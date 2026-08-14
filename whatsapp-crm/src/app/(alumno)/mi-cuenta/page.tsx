@@ -5,6 +5,7 @@ import { getCurrentAlumno } from "@/lib/alumno";
 import { getGymContext } from "@/lib/gym";
 import { hoyISOArgentina } from "@/lib/tz";
 import { cuotaPorVencer } from "@/lib/gymCuota";
+import { mpHabilitadoParaAlumno } from "@/lib/gymMpPrueba";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import CuotaAcciones from "@/components/gimnasio/CuotaAcciones";
@@ -86,7 +87,10 @@ export default async function MiCuentaPage() {
 
       <CuotaAcciones
         montoARS={montoARS}
-        mostrarPago={cuotaPorVencer(alumno.cuota_hasta)}
+        mostrarPago={
+          cuotaPorVencer(alumno.cuota_hasta) &&
+          mpHabilitadoParaAlumno(alumno.telefono)
+        }
       />
 
       {alumno.telefono ? (

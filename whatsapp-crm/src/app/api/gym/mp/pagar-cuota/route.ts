@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { crearPreferenciaPago, mpConfigurado } from "@/lib/mercadopago";
+import { mpHabilitadoParaAlumno } from "@/lib/gymMpPrueba";
 import { appBaseUrl } from "@/lib/appUrl";
 
 // Pago ÚNICO de la cuota, iniciado por el ALUMNO logueado (no el admin). Toma el
@@ -17,6 +18,14 @@ export async function POST(request: NextRequest) {
   const alumno = await getCurrentAlumno(supabase);
   if (!alumno) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  // TEMPORAL: el pago online está habilitado solo para cuentas de prueba.
+  if (!mpHabilitadoParaAlumno(alumno.telefono)) {
+    return NextResponse.json(
+      { error: "El pago online todavía no está habilitado." },
+      { status: 403 },
+    );
   }
 
   if (!mpConfigurado()) {
