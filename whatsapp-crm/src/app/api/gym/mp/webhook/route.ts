@@ -1,17 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  getPayment,
-  getPreapproval,
-  mpConfigurado,
-  verificarFirmaWebhook,
-} from "@/lib/mercadopago";
+import { getPayment, mpConfigurado, verificarFirmaWebhook } from "@/lib/mercadopago";
 import { hoyISOArgentina } from "@/lib/tz";
 import { proximoVencimientoISO } from "@/lib/gymCuota";
 
-// Webhook de MercadoPago: MP nos avisa de cada cobro / cambio de suscripción.
-// - payment approved  -> renueva la cuota del socio (vence el 10 del mes que viene).
-// - preapproval       -> espeja el estado (authorized/paused/cancelled).
+// Webhook de MercadoPago: MP nos avisa de cada cobro.
+// - payment approved -> acredita la cuota del socio (vence el 10 del mes que viene)
+//   y lo deja anotado en el libro de pagos.
+// No hay suscripciones/débito automático: todos los pagos son únicos.
 // Público (lo llama MP), fuera del proxy de sesión (está bajo /api).
 //
 // TODO(cuenta MP): con credenciales reales, VERIFICAR contra los payloads que
@@ -84,20 +80,12 @@ export async function POST(request: NextRequest) {
             const actual = al.cuota_hasta as string | null;
             // Vencimiento siempre el 10 del mes que viene (regla única de cuota).
             const nuevaCuota = proximoVencimientoISO(actual, hoy);
-            // Un pago con `preapproval_id` viene de la SUSCRIPCIÓN (débito
-            // automático); uno sin él es un pago ÚNICO (Checkout Pro). Solo el
-            // primero marca al socio como adherido al débito — si no, un pago
-            // suelto lo haría figurar en débito sin estarlo.
-            const esSuscripcion = Boolean(pago.preapproval_id);
             await sb
               .from("gym_alumnos")
               .update({
                 es_socio: true,
                 cuota_hasta: nuevaCuota,
                 mp_last_payment_id: dataId,
-                ...(esSuscripcion
-                  ? { metodo_pago: "mercadopago", mp_estado: "authorized" }
-                  : {}),
               })
               .eq("id", alumnoId);
 
@@ -109,20 +97,11 @@ export async function POST(request: NextRequest) {
               fecha: hoy,
               monto: typeof pago.transaction_amount === "number" ? pago.transaction_amount : null,
               metodo: "mercadopago",
-              nota: esSuscripcion ? "Débito automático" : "Pago con MercadoPago",
+              nota: "Pago con MercadoPago",
               cuota_hasta: nuevaCuota,
             });
           }
         }
-      }
-    } else if (tipoFinal.includes("preapproval") || tipoFinal.includes("subscription")) {
-      const pre = await getPreapproval(dataId);
-      const alumnoId = pre.external_reference;
-      const patch = { mp_estado: pre.status };
-      if (alumnoId) {
-        await sb.from("gym_alumnos").update(patch).eq("id", alumnoId);
-      } else {
-        await sb.from("gym_alumnos").update(patch).eq("mp_preapproval_id", pre.id);
       }
     }
   } catch (e) {

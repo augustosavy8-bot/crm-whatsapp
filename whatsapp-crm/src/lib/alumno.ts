@@ -8,8 +8,6 @@ export interface CurrentAlumno {
   email: string | null;
   es_socio: boolean;
   cuota_hasta: string | null; // YYYY-MM-DD
-  metodo_pago: "efectivo" | "mercadopago";
-  mp_estado: string | null;
 }
 
 // Alumno logueado (su propia fila en `gym_alumnos`, vinculada por auth_user_id).
@@ -26,9 +24,7 @@ export async function getCurrentAlumno(
 
   const { data } = await sb
     .from("gym_alumnos")
-    .select(
-      "id, tenant_id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, mp_estado",
-    )
+    .select("id, tenant_id, nombre, telefono, email, es_socio, cuota_hasta")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -36,6 +32,5 @@ export async function getCurrentAlumno(
   return {
     ...data,
     es_socio: data.es_socio === true,
-    metodo_pago: data.metodo_pago === "mercadopago" ? "mercadopago" : "efectivo",
   } as CurrentAlumno;
 }

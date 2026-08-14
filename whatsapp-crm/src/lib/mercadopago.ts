@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 
 // ============================================================
-// Cliente mínimo de MercadoPago para el débito automático de la cuota del
-// gimnasio (suscripciones = "preapproval"). REST directo, sin SDK.
+// Cliente mínimo de MercadoPago para el PAGO ÚNICO de la cuota del gimnasio
+// (Checkout Pro). El socio paga su mes desde la app y lo redirige a MercadoPago.
+// No hay débito automático / suscripciones. REST directo, sin SDK.
 //
 // TODO(cuenta MP): cablear las env vars cuando el gimnasio tenga su cuenta:
 //   MP_ACCESS_TOKEN     access token de PRODUCCIÓN (o TEST para probar)
@@ -38,44 +39,6 @@ function mpError(status: number, data: Record<string, unknown>): Error {
   return new Error(
     `MercadoPago ${status}: ${base}${cause ? ` — ${cause}` : ""}`,
   );
-}
-
-export interface Preapproval {
-  id: string;
-  status: string; // pending | authorized | paused | cancelled
-  init_point?: string;
-  external_reference?: string;
-}
-
-// Crea una suscripción mensual y devuelve el init_point: la URL a la que el
-// socio entra UNA vez para poner su tarjeta y autorizar el débito recurrente.
-export async function crearPreapproval(args: {
-  alumnoId: string;
-  email: string;
-  montoARS: number;
-  backUrl: string;
-  reason: string;
-}): Promise<Preapproval> {
-  const res = await fetch(`${MP_API}/preapproval`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      reason: args.reason,
-      external_reference: args.alumnoId,
-      payer_email: args.email,
-      back_url: args.backUrl,
-      status: "pending",
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: "months",
-        transaction_amount: args.montoARS,
-        currency_id: "ARS",
-      },
-    }),
-  });
-  const data = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) throw mpError(res.status, data);
-  return data as unknown as Preapproval;
 }
 
 export interface Preferencia {
@@ -123,39 +86,11 @@ export async function crearPreferenciaPago(args: {
   return data as unknown as Preferencia;
 }
 
-// Actualiza el monto de una suscripción existente (cuando cambia el precio del
-// plan). MP aplica el nuevo monto en el próximo cobro. Solo tiene sentido sobre
-// suscripciones activas/pendientes (authorized|pending).
-export async function actualizarPreapprovalMonto(
-  id: string,
-  montoARS: number,
-): Promise<void> {
-  const res = await fetch(`${MP_API}/preapproval/${id}`, {
-    method: "PUT",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      auto_recurring: { transaction_amount: montoARS, currency_id: "ARS" },
-    }),
-  });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    throw mpError(res.status, data);
-  }
-}
-
-export async function getPreapproval(id: string): Promise<Preapproval> {
-  const res = await fetch(`${MP_API}/preapproval/${id}`, { headers: authHeaders() });
-  const data = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) throw new Error(`MercadoPago respondió ${res.status}`);
-  return data as unknown as Preapproval;
-}
-
 export interface MpPayment {
   id: number;
   status: string; // approved | rejected | ...
   external_reference?: string;
   metadata?: Record<string, unknown>;
-  preapproval_id?: string;
   transaction_amount?: number; // monto cobrado, para el libro de pagos
 }
 

@@ -115,15 +115,13 @@ export default function GimnasioPanel({
 }
 
 // ------------------------------------------------------------
-// Planes (cuota por días/semana). El admin crea y edita precios; al cambiar un
-// precio, la API actualiza el débito automático de los socios ya adheridos.
+// Planes (cuota por días/semana). El admin crea y edita los precios de cada plan.
 // ------------------------------------------------------------
 function Planes() {
   const sb = useMemo(() => createClient(), []);
   const [planes, setPlanes] = useState<GymPlan[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [aviso, setAviso] = useState<string | null>(null);
 
   const [nombre, setNombre] = useState("");
   const [dias, setDias] = useState("");
@@ -151,7 +149,6 @@ function Planes() {
 
   async function crear() {
     setError(null);
-    setAviso(null);
     if (!nombre.trim() || !precio.trim()) {
       setError("Nombre y precio obligatorios.");
       return;
@@ -180,7 +177,6 @@ function Planes() {
 
   async function guardarPrecio(p: GymPlan) {
     setError(null);
-    setAviso(null);
     const res = await fetch("/api/gym/planes", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -190,13 +186,6 @@ function Planes() {
     if (!res.ok) {
       setError(data.error || "No se pudo actualizar.");
       return;
-    }
-    if (data.actualizados > 0 || data.fallidos > 0) {
-      setAviso(
-        `Débito automático: ${data.actualizados} actualizado(s)` +
-          (data.fallidos ? `, ${data.fallidos} con error` : "") +
-          ".",
-      );
     }
     setEditId(null);
     cargar();
@@ -254,7 +243,6 @@ function Planes() {
       </div>
 
       {error && <p className="text-[13px] text-danger">{error}</p>}
-      {aviso && <p className="text-[13px] text-ok">{aviso}</p>}
 
       {cargando ? (
         <p className="py-8 text-center text-sm text-muted">Cargando…</p>
@@ -1119,8 +1107,6 @@ function Socios({ tenantId }: { tenantId: string }) {
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [guardando, setGuardando] = useState(false);
-  // Links de adhesión MP generados en esta sesión, por socio.
-  const [mpLinks, setMpLinks] = useState<Record<string, string>>({});
   // Links de invitación (crear cuenta) generados en esta sesión, por socio.
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
   // Links de recuperación de contraseña generados en esta sesión, por socio.
@@ -1365,31 +1351,6 @@ function Socios({ tenantId }: { tenantId: string }) {
     }
   }
 
-  // Genera el link de adhesión al débito automático de MercadoPago para el
-  // socio. Requiere email (si no lo tiene, lo pedimos). Si MP no está
-  // configurado todavía, la ruta devuelve 503 con un mensaje claro.
-  async function adherirMp(s: GymSocio) {
-    setError(null);
-    let email = s.email ?? "";
-    if (!email) {
-      email = window.prompt(`Email de ${s.nombre} para MercadoPago:`)?.trim() ?? "";
-      if (!email) return;
-    }
-    const res = await fetch("/api/gym/mp/adherir", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ alumnoId: s.id, email }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error || "No se pudo generar la adhesión.");
-      return;
-    }
-    if (data.initPoint) {
-      setMpLinks((m) => ({ ...m, [s.id]: data.initPoint }));
-    }
-    cargar();
-  }
 
   // Genera (o regenera) el link de invitación para que el alumno cree su
   // cuenta, y lo copia al portapapeles. Sin este link nadie puede registrarse.
@@ -1669,7 +1630,7 @@ function Socios({ tenantId }: { tenantId: string }) {
                   </div>
                 )}
 
-                {/* Plan (define el precio de la cuota / débito automático) */}
+                {/* Plan (define el precio de la cuota) */}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="text-[12px] font-semibold text-muted">
                     Plan
@@ -1925,40 +1886,6 @@ function Socios({ tenantId }: { tenantId: string }) {
                     )}
                   </div>
                 )}
-                {s.metodo_pago === "mercadopago" && (
-                  <div className="mt-2 border-t border-line pt-2">
-                    {s.mp_estado === "authorized" ? (
-                      <span className="text-[12px] font-semibold text-ok">
-                        ✓ Débito automático activo
-                      </span>
-                    ) : (
-                      <div className="space-y-2">
-                        <button
-                          onClick={() => adherirMp(s)}
-                          className="text-[12px] font-semibold text-accent hover:brightness-90"
-                        >
-                          Generar link de adhesión (débito automático)
-                        </button>
-                        {mpLinks[s.id] && (
-                          <a
-                            href={mpLinks[s.id]}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block truncate rounded-lg bg-surface-2 px-2 py-1.5 text-[11px] text-accent underline"
-                          >
-                            {mpLinks[s.id]}
-                          </a>
-                        )}
-                        {s.mp_estado && s.mp_estado !== "authorized" && (
-                          <p className="text-[11px] text-muted">
-                            Estado MP: {s.mp_estado}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Acceso: link de invitación para crear cuenta */}
                 <div className="mt-2 border-t border-line pt-2">
                   {s.auth_user_id ? (

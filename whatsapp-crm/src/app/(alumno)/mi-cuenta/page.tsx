@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { getGymContext } from "@/lib/gym";
 import { hoyISOArgentina } from "@/lib/tz";
-import { cuotaPorVencer, debitoActivo } from "@/lib/gymCuota";
+import { cuotaPorVencer } from "@/lib/gymCuota";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import CuotaAcciones from "@/components/gimnasio/CuotaAcciones";
@@ -24,11 +24,7 @@ interface EstadoCuota {
   detalle: string;
 }
 
-function estadoCuota(
-  cuotaHasta: string | null,
-  metodoPago: "efectivo" | "mercadopago",
-  mpEstado: string | null,
-): EstadoCuota {
+function estadoCuota(cuotaHasta: string | null): EstadoCuota {
   if (!cuotaHasta) {
     return {
       tono: "neutral",
@@ -44,14 +40,10 @@ function estadoCuota(
       detalle: `Venció el ${fmtFecha(cuotaHasta)}. Regularizá para seguir reservando.`,
     };
   }
-  const debito =
-    metodoPago === "mercadopago" && mpEstado === "authorized"
-      ? " · Débito automático activo"
-      : "";
   return {
     tono: "ok",
     titulo: "Cuota al día",
-    detalle: `Al día hasta el ${fmtFecha(cuotaHasta)}${debito}.`,
+    detalle: `Al día hasta el ${fmtFecha(cuotaHasta)}.`,
   };
 }
 
@@ -67,7 +59,7 @@ export default async function MiCuentaPage() {
   if (!alumno) redirect("/login");
 
   const gym = await getGymContext();
-  const cuota = estadoCuota(alumno.cuota_hasta, alumno.metodo_pago, alumno.mp_estado);
+  const cuota = estadoCuota(alumno.cuota_hasta);
   const primerNombre = alumno.nombre.split(" ")[0];
 
   // Precio del plan del socio (fuente confiable server-side), para mostrar el
@@ -95,8 +87,6 @@ export default async function MiCuentaPage() {
       <CuotaAcciones
         montoARS={montoARS}
         mostrarPago={cuotaPorVencer(alumno.cuota_hasta)}
-        debitoActivo={debitoActivo(alumno.metodo_pago, alumno.mp_estado)}
-        tieneEmail={Boolean(alumno.email)}
       />
 
       {alumno.telefono ? (

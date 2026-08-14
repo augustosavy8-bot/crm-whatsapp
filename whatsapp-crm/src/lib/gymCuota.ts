@@ -9,14 +9,6 @@ export function cuotaPorVencer(cuotaHasta: string | null, dias = 7): boolean {
   return hoyISOArgentina() >= restarDiasISO(cuotaHasta, dias);
 }
 
-// Débito automático realmente activo (adherido y autorizado por MP).
-export function debitoActivo(
-  metodoPago: string | null,
-  mpEstado: string | null,
-): boolean {
-  return metodoPago === "mercadopago" && mpEstado === "authorized";
-}
-
 // Resta días a un "YYYY-MM-DD" vía mediodía UTC (estable ante DST).
 function restarDiasISO(iso: string, dias: number): string {
   const d = new Date(`${iso}T12:00:00Z`);
