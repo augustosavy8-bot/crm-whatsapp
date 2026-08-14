@@ -216,6 +216,50 @@ export async function getPagosSocio(
   return (data ?? []) as GymPago[];
 }
 
+// --- Días cerrados / feriados ---
+
+export interface GymDiaCerrado {
+  id: string;
+  fecha: string; // YYYY-MM-DD
+  motivo: string | null;
+}
+
+// Días cerrados desde una fecha en adelante (para no arrastrar feriados viejos).
+export async function getDiasCerrados(
+  sb: SupabaseClient,
+  desde: string,
+): Promise<GymDiaCerrado[]> {
+  const { data, error } = await sb
+    .from("gym_dias_cerrados")
+    .select("id, fecha, motivo")
+    .gte("fecha", desde)
+    .order("fecha", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as GymDiaCerrado[];
+}
+
+// Marca un día como cerrado (feriado) y cancela las reservas sueltas de ese día.
+export async function marcarDiaCerrado(
+  sb: SupabaseClient,
+  fecha: string,
+  motivo: string | null,
+): Promise<void> {
+  const { error } = await sb.rpc("gym_marcar_dia_cerrado", {
+    p_fecha: fecha,
+    p_motivo: motivo,
+  });
+  if (error) throw error;
+}
+
+// Reabre un día cerrado (borra el feriado). Las reservas ya canceladas no vuelven.
+export async function quitarDiaCerrado(
+  sb: SupabaseClient,
+  id: string,
+): Promise<void> {
+  const { error } = await sb.from("gym_dias_cerrados").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // --- Deuda (cuotas mensuales adeudadas) ---
 
 export interface GymCuotaAdeudada {

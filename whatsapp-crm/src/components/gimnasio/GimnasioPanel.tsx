@@ -8,18 +8,22 @@ import {
   crearGymHorario,
   getAsistencias,
   getDeudaResumen,
+  getDiasCerrados,
   getGymAlumnos,
   getGymHorarios,
   getGymOcupacion,
   getPagosSocio,
   getPlanes,
   marcarAsistencia,
+  marcarDiaCerrado,
+  quitarDiaCerrado,
   registrarPagoGym,
   setGymHorarioActivo,
   updateGymSocio,
   type AsistenciaEstado,
   type GymAlumnoEnClase,
   type GymCuotaAdeudada,
+  type GymDiaCerrado,
   type GymHorario,
   type GymOcupacionHorario,
   type GymPago,
@@ -341,17 +345,23 @@ function Agenda({ tenantId }: { tenantId: string }) {
   const [aviso, setAviso] = useState<string | null>(null); // toast realtime
   // Asistencia del día: clave `${alumnoId}|${horarioId}` -> presente/ausente.
   const [asist, setAsist] = useState<Record<string, AsistenciaEstado>>({});
+  // Días cerrados (feriados) de hoy en adelante, por fecha.
+  const [cerrados, setCerrados] = useState<Record<string, GymDiaCerrado>>({});
 
   const cargar = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      const [ocup, asis] = await Promise.all([
+      const [ocup, asis, dias] = await Promise.all([
         getGymOcupacion(sb, fecha),
         getAsistencias(sb, fecha),
+        getDiasCerrados(sb, hoyISOArgentina()),
       ]);
       setData(ocup);
       setAsist(asis);
+      setCerrados(
+        Object.fromEntries(dias.map((d) => [d.fecha, d])),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la agenda.");
       setData([]);
@@ -359,6 +369,34 @@ function Agenda({ tenantId }: { tenantId: string }) {
       setCargando(false);
     }
   }, [sb, fecha]);
+
+  const cerrado = cerrados[fecha];
+
+  // Declara el día que se está viendo como cerrado (feriado): cancela las
+  // reservas sueltas de ese día y bloquea nuevas.
+  async function marcarCerrado() {
+    const motivo = window.prompt(
+      "¿Por qué cierra ese día? (feriado, cierre…). Opcional:",
+      "Feriado",
+    );
+    if (motivo === null) return; // canceló
+    try {
+      await marcarDiaCerrado(sb, fecha, motivo.trim() || null);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo marcar el día.");
+    }
+  }
+
+  async function reabrirDia() {
+    if (!cerrado) return;
+    try {
+      await quitarDiaCerrado(sb, cerrado.id);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo reabrir el día.");
+    }
+  }
 
   // Marca presente/ausente (toggle: volver a tocar el mismo estado lo quita).
   async function marcar(
@@ -581,17 +619,49 @@ function Agenda({ tenantId }: { tenantId: string }) {
         </button>
       </div>
 
+      {/* Día cerrado (feriado): declarar / reabrir */}
+      <div className="flex items-center justify-center gap-2">
+        {cerrado ? (
+          <>
+            <span className="rounded-full bg-danger/15 px-3 py-1 text-[12px] font-bold text-danger">
+              Cerrado{cerrado.motivo ? ` · ${cerrado.motivo}` : ""}
+            </span>
+            <button
+              onClick={reabrirDia}
+              className="text-[12px] font-semibold text-accent hover:brightness-90"
+            >
+              Reabrir
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={marcarCerrado}
+            className="rounded-full border border-line px-3 py-1 text-[12px] font-semibold text-muted hover:border-faint hover:text-ink"
+          >
+            Marcar día cerrado (feriado)
+          </button>
+        )}
+      </div>
+
       {error && <p className="text-[13px] text-danger">{error}</p>}
 
       {cargando && <p className="py-8 text-center text-sm text-muted">Cargando…</p>}
 
-      {!cargando && data.length === 0 && (
+      {!cargando && cerrado && (
+        <p className="py-8 text-center text-sm text-muted">
+          Gimnasio cerrado este día
+          {cerrado.motivo ? ` (${cerrado.motivo})` : ""}. No hay clases ni reservas.
+        </p>
+      )}
+
+      {!cargando && !cerrado && data.length === 0 && (
         <p className="py-8 text-center text-sm text-muted">
           No hay clases este día. Cargá horarios en la pestaña “Horarios”.
         </p>
       )}
 
       {!cargando &&
+        !cerrado &&
         data.map((h) => {
           const lleno = h.cupo_usado >= h.capacidad_max;
           return (
@@ -892,17 +962,53 @@ function Horarios({ tenantId }: { tenantId: string }) {
   const [cap, setCap] = useState(10);
   const [guardando, setGuardando] = useState(false);
 
+  // Días cerrados / feriados
+  const [diasCerrados, setDiasCerrados] = useState<GymDiaCerrado[]>([]);
+  const [nuevoCierre, setNuevoCierre] = useState("");
+  const [motivoCierre, setMotivoCierre] = useState("");
+
   const cargar = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      setHorarios(await getGymHorarios(sb));
+      const [hs, dias] = await Promise.all([
+        getGymHorarios(sb),
+        getDiasCerrados(sb, hoyISOArgentina()),
+      ]);
+      setHorarios(hs);
+      setDiasCerrados(dias);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar.");
     } finally {
       setCargando(false);
     }
   }, [sb]);
+
+  async function agregarCierre() {
+    setError(null);
+    if (!nuevoCierre) {
+      setError("Elegí una fecha para cerrar.");
+      return;
+    }
+    try {
+      await marcarDiaCerrado(sb, nuevoCierre, motivoCierre.trim() || null);
+      setNuevoCierre("");
+      setMotivoCierre("");
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo marcar el día.");
+    }
+  }
+
+  async function quitarCierre(id: string) {
+    setError(null);
+    try {
+      await quitarDiaCerrado(sb, id);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo reabrir el día.");
+    }
+  }
 
   useEffect(() => {
     cargar();
@@ -1004,6 +1110,65 @@ function Horarios({ tenantId }: { tenantId: string }) {
         >
           {guardando ? "Creando…" : "Agregar horario"}
         </button>
+      </div>
+
+      {/* Días cerrados / feriados */}
+      <div className="space-y-3 rounded-panel border border-line bg-surface p-4 shadow-card">
+        <div className="text-[14px] font-bold">Días cerrados (feriados)</div>
+        <p className="text-[12px] text-muted">
+          Marcá los días que el gimnasio no abre. Esos días no se pueden reservar
+          y se cancelan las reservas sueltas que hubiera.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+            Fecha
+            <input
+              type="date"
+              value={nuevoCierre}
+              min={hoyISOArgentina()}
+              onChange={(e) => setNuevoCierre(e.target.value)}
+              className={input}
+            />
+          </label>
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-muted">
+            Motivo (opcional)
+            <input
+              value={motivoCierre}
+              onChange={(e) => setMotivoCierre(e.target.value)}
+              placeholder="Feriado, cierre…"
+              className={`${input} w-full`}
+            />
+          </label>
+          <button
+            onClick={agregarCierre}
+            className="rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-white"
+          >
+            Cerrar día
+          </button>
+        </div>
+        {diasCerrados.length > 0 && (
+          <ul className="space-y-1.5">
+            {diasCerrados.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center justify-between gap-2 rounded-card border border-line bg-surface-2 px-3 py-2"
+              >
+                <span className="text-[13px]">
+                  <span className="font-bold">{fechaCorta(d.fecha)}</span>
+                  {d.motivo ? (
+                    <span className="text-muted"> · {d.motivo}</span>
+                  ) : null}
+                </span>
+                <button
+                  onClick={() => quitarCierre(d.id)}
+                  className="shrink-0 text-[12px] font-semibold text-accent hover:brightness-90"
+                >
+                  Reabrir
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Lista */}
