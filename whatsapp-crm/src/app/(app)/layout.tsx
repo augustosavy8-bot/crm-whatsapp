@@ -61,11 +61,7 @@ export default async function AppLayout({
           </span>
         </Link>
         <div className="flex min-w-0 flex-1 justify-center overflow-x-auto">
-          <HeaderNav
-            role={agente?.role}
-            inboxEnabled={modulos.inbox}
-            gymAdmin={esGymAdmin}
-          />
+          <HeaderNav />
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <span className="hidden text-xs text-muted lg:block">
