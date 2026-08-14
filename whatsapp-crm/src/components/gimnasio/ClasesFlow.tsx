@@ -155,6 +155,7 @@ function Reservar({ sesion }: { sesion?: SesionAlumno }) {
   const dias = useMemo(construirDias, []);
   const [diaSel, setDiaSel] = useState<string | null>(null);
   const [horarios, setHorarios] = useState<HorarioDia[]>([]);
+  const [cerrado, setCerrado] = useState<{ motivo: string | null } | null>(null);
   const [cargando, setCargando] = useState(false);
   const [refetch, setRefetch] = useState(0);
 
@@ -172,11 +173,13 @@ function Reservar({ sesion }: { sesion?: SesionAlumno }) {
     setCargando(true);
     setSel(null);
     setError(null);
+    setCerrado(null);
     fetch(`/api/gym/horarios?fecha=${diaSel}`)
       .then((r) => r.json())
       .then((d) => {
         if (!vigente) return;
         setHorarios(Array.isArray(d.horarios) ? d.horarios : []);
+        setCerrado(d.cerrado ? { motivo: d.motivo ?? null } : null);
       })
       .catch(() => vigente && setHorarios([]))
       .finally(() => vigente && setCargando(false));
@@ -410,12 +413,18 @@ function Reservar({ sesion }: { sesion?: SesionAlumno }) {
         {diaSel && cargando && (
           <p className="pt-6 text-center text-sm text-muted">Buscando clases…</p>
         )}
-        {diaSel && !cargando && horarios.length === 0 && (
+        {diaSel && !cargando && cerrado && (
+          <p className="pt-6 text-center text-sm font-semibold text-danger">
+            El gimnasio está cerrado ese día
+            {cerrado.motivo ? ` (${cerrado.motivo})` : ""}. Elegí otro.
+          </p>
+        )}
+        {diaSel && !cargando && !cerrado && horarios.length === 0 && (
           <p className="pt-6 text-center text-sm text-muted">
             No hay clases ese día. Probá con otro.
           </p>
         )}
-        {diaSel && !cargando && horarios.length > 0 && (
+        {diaSel && !cargando && !cerrado && horarios.length > 0 && (
           <div className="space-y-2">
             {horarios.map((h) => {
               const lugares = h.capacidad_max - h.cupo_usado;

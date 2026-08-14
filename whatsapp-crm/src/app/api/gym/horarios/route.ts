@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getGymContext } from "@/lib/gym";
 import { getHorariosDia } from "@/lib/gymCupo";
+import { createServiceClient } from "@/lib/supabase/service";
 import { AR_TZ } from "@/lib/tz";
 
 // Grilla pública del alumno: horarios de un día con su cupo usado/total.
@@ -31,6 +32,22 @@ export async function GET(request: NextRequest) {
   const gym = await getGymContext();
   if (!gym) {
     return NextResponse.json({ error: "Gimnasio no configurado" }, { status: 503 });
+  }
+
+  // Día cerrado (feriado): no hay clases ni se puede reservar.
+  const svc = createServiceClient();
+  const { data: cerrado } = await svc
+    .from("gym_dias_cerrados")
+    .select("motivo")
+    .eq("tenant_id", gym.tenantId)
+    .eq("fecha", fecha)
+    .maybeSingle();
+  if (cerrado) {
+    return NextResponse.json({
+      horarios: [],
+      cerrado: true,
+      motivo: (cerrado.motivo as string | null) ?? null,
+    });
   }
 
   const horarios = await getHorariosDia(gym.tenantId, fecha);
