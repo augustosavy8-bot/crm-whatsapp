@@ -863,8 +863,8 @@ function AgregarAlumno({
 
   async function guardar() {
     setError(null);
-    if (!nombre.trim() || !telefono.trim()) {
-      setError("Nombre y WhatsApp obligatorios.");
+    if (!nombre.trim()) {
+      setError("El nombre es obligatorio.");
       return;
     }
     setEnviando(true);
@@ -905,7 +905,7 @@ function AgregarAlumno({
         <input
           value={telefono}
           onChange={(e) => setTelefono(e.target.value)}
-          placeholder="WhatsApp"
+          placeholder="WhatsApp (opcional)"
           inputMode="tel"
           className={input}
         />

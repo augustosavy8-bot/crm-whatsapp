@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
   const nombre = body.nombre?.trim();
   const telefonoRaw = body.telefono?.trim();
 
-  if (!horarioId || !fecha || !nombre || !telefonoRaw) {
-    return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+  if (!horarioId || !fecha || !nombre) {
+    return NextResponse.json({ error: "Falta el nombre" }, { status: 400 });
   }
   if (tipo !== "suelta" && tipo !== "fijo") {
     return NextResponse.json({ error: "Tipo inválido" }, { status: 400 });
@@ -53,9 +53,14 @@ export async function POST(request: NextRequest) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     return NextResponse.json({ error: "Fecha inválida" }, { status: 400 });
   }
-  const telefono = normalizeArPhone(telefonoRaw);
-  if (telefono.length < 10) {
-    return NextResponse.json({ error: "WhatsApp inválido" }, { status: 400 });
+  // El WhatsApp es OPCIONAL en el alta a mano del staff. Si lo cargan, se
+  // valida y normaliza; si no, se anota igual sin número.
+  let telefono = "";
+  if (telefonoRaw) {
+    telefono = normalizeArPhone(telefonoRaw);
+    if (telefono.length < 10) {
+      return NextResponse.json({ error: "WhatsApp inválido" }, { status: 400 });
+    }
   }
 
   // El horario tiene que ser del tenant del admin. Con el cliente de sesión RLS
