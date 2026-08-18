@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentAgent, esGymStaff } from "@/lib/agent";
+import { currentAgent, esGymStaff } from "@/lib/agent";
 import { staffPuedeRutinas } from "@/lib/gymRutinaPrueba";
 import GimnasioPanel from "@/components/gimnasio/GimnasioPanel";
 import PushButton from "@/components/notifications/PushButton";
@@ -9,8 +8,7 @@ import PushButton from "@/components/notifications/PushButton";
 // o gym_admin). RLS igual sella los datos por tenant/gate; esto es la barrera
 // de UI.
 export default async function GymPanelPage() {
-  const supabase = await createClient();
-  const agent = await getCurrentAgent(supabase);
+  const agent = await currentAgent();
   if (!agent) redirect("/login");
   if (!esGymStaff(agent)) redirect("/turnos");
 

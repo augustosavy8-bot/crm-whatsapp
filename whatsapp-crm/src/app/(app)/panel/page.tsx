@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentAgent } from "@/lib/agent";
+import { currentAgent } from "@/lib/agent";
 import GraficoBarras from "@/components/panel/GraficoBarras";
 
 export const dynamic = "force-dynamic";
@@ -34,11 +34,11 @@ const BRAND = "var(--color-brand)";
 
 // Panel de estadísticas del dueño. Solo lo ve quien tenga panel_stats (hoy vos).
 export default async function PanelPage() {
-  const supabase = await createClient();
-  const agent = await getCurrentAgent(supabase);
+  const agent = await currentAgent();
   if (!agent) redirect("/login");
   if (!agent.panel_stats) redirect("/turnos");
 
+  const supabase = await createClient();
   const { data, error } = await supabase.rpc("panel_estadisticas", { p_dias: 30 });
   const stats = (data ?? null) as Stats | null;
 

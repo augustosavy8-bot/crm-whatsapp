@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { currentAgent, currentUser } from "@/lib/agent";
 import { getModulosTenant } from "@/lib/modulos";
 import SignOutButton from "@/components/SignOutButton";
 import HeaderNav from "@/components/HeaderNav";
@@ -15,17 +16,11 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await currentUser();
   if (!user) redirect("/login");
 
-  const { data: agente } = await supabase
-    .from("agents")
-    .select("role, gym_admin")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  // Cacheado por request: el mismo agente lo reusa la página sin re-consultar.
+  const agente = await currentAgent();
   const esProfesional = agente?.role === "profesional";
   const esGymAdmin = agente?.gym_admin === true;
   // Staff del gimnasio (owner | profesional | gym_admin): reciben el aviso
@@ -37,7 +32,7 @@ export default async function AppLayout({
   // El profesional tiene nav fija (gimnasio + su agenda), no depende de esto.
   const modulos = esProfesional
     ? { inbox: false, turnos: true }
-    : await getModulosTenant(supabase);
+    : await getModulosTenant(await createClient());
 
   // El chrome de mensajería (bell, push, toasts/beeps Realtime) es parte del
   // módulo inbox: si el tenant no lo tiene, no se monta. El webhook, el envío

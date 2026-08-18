@@ -1,4 +1,7 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "./supabase/server";
+import { currentUser } from "./agent";
 
 export interface CurrentAlumno {
   id: string;
@@ -34,3 +37,18 @@ export async function getCurrentAlumno(
     es_socio: data.es_socio === true,
   } as CurrentAlumno;
 }
+
+// Alumno logueado, cacheado POR REQUEST (una sola validación de sesión + lectura
+// compartida entre layout y página). Usar en Server Components.
+export const currentAlumno = cache(async (): Promise<CurrentAlumno | null> => {
+  const user = await currentUser();
+  if (!user) return null;
+  const sb = await createClient();
+  const { data } = await sb
+    .from("gym_alumnos")
+    .select("id, tenant_id, nombre, telefono, email, es_socio, cuota_hasta")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (!data || !data.tenant_id) return null;
+  return { ...data, es_socio: data.es_socio === true } as CurrentAlumno;
+});

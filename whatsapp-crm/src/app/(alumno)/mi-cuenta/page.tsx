@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getCurrentAlumno } from "@/lib/alumno";
+import { currentAlumno } from "@/lib/alumno";
 import { getGymContext } from "@/lib/gym";
 import { hoyISOArgentina } from "@/lib/tz";
 import { cuotaPorVencer } from "@/lib/gymCuota";
@@ -58,22 +57,23 @@ const TONO: Record<EstadoCuota["tono"], string> = {
 };
 
 export default async function MiCuentaPage() {
-  const supabase = await createClient();
-  const alumno = await getCurrentAlumno(supabase);
+  const alumno = await currentAlumno();
   if (!alumno) redirect("/login");
 
-  const gym = await getGymContext();
   const cuota = estadoCuota(alumno.cuota_hasta);
   const primerNombre = alumno.nombre.split(" ")[0];
 
-  // Precio del plan del socio (fuente confiable server-side), para mostrar el
-  // monto en el botón de pago. El alumno puede no tener RLS sobre gym_planes.
+  // Contexto del gym y precio del plan en paralelo (son independientes).
   const svc = createServiceClient();
-  const { data: alPlan } = await svc
-    .from("gym_alumnos")
-    .select("plan:gym_planes(precio)")
-    .eq("id", alumno.id)
-    .maybeSingle();
+  const [gym, alPlan] = await Promise.all([
+    getGymContext(),
+    svc
+      .from("gym_alumnos")
+      .select("plan:gym_planes(precio)")
+      .eq("id", alumno.id)
+      .maybeSingle()
+      .then((r) => r.data),
+  ]);
   const montoARS =
     (alPlan?.plan as unknown as { precio: number } | null)?.precio ?? null;
 

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentAlumno } from "@/lib/alumno";
+import { currentAlumno } from "@/lib/alumno";
 import SignOutButton from "@/components/SignOutButton";
 import PushButton from "@/components/notifications/PushButton";
 
@@ -11,8 +10,7 @@ export default async function AlumnoLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const alumno = await getCurrentAlumno(supabase);
+  const alumno = await currentAlumno();
   if (!alumno) redirect("/login");
 
   return (

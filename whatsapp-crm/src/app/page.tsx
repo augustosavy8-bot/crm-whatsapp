@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentAgent } from "@/lib/agent";
-import { getCurrentAlumno } from "@/lib/alumno";
+import { currentAgent } from "@/lib/agent";
+import { currentAlumno } from "@/lib/alumno";
 
 // La raíz separa los mundos por rol:
 //   sin sesión   -> login (la página principal del sitio es el ingreso)
@@ -9,8 +8,7 @@ import { getCurrentAlumno } from "@/lib/alumno";
 //   staff        -> panel del gimnasio (la app está centrada en el gym)
 //   owner c/stats -> su panel de estadísticas
 export default async function Home() {
-  const supabase = await createClient();
-  const agent = await getCurrentAgent(supabase);
+  const agent = await currentAgent();
   if (agent) {
     // El dueño con panel de estadísticas cae ahí (puede navegar al gimnasio).
     if (agent.panel_stats) redirect("/panel");
@@ -19,7 +17,7 @@ export default async function Home() {
   }
 
   // Sin agente: puede ser un alumno logueado o alguien sin sesión.
-  const alumno = await getCurrentAlumno(supabase);
+  const alumno = await currentAlumno();
   if (alumno) redirect("/mi-cuenta");
   // Sin sesión: la página principal es el login (la landing pública sigue en
   // /gimnasio para quien tenga el link directo).
