@@ -13,3 +13,13 @@ const TELEFONOS_PRUEBA_RUTINA = new Set<string>([
 export function rutinaHabilitadaParaAlumno(telefono: string | null): boolean {
   return !!telefono && TELEFONOS_PRUEBA_RUTINA.has(telefono);
 }
+
+// Staff que puede crear/editar rutinas. Por ahora solo el perfil de prueba;
+// para habilitar a todo el staff, que `staffPuedeRutinas` devuelva true.
+const EMAILS_STAFF_RUTINA = new Set<string>([
+  "augustosavy8@gmail.com", // Augusto Savy (staff de prueba)
+]);
+
+export function staffPuedeRutinas(email: string | null): boolean {
+  return !!email && EMAILS_STAFF_RUTINA.has(email.toLowerCase());
+}

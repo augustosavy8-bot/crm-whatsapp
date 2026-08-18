@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent, esGymStaff } from "@/lib/agent";
+import { staffPuedeRutinas } from "@/lib/gymRutinaPrueba";
 import GimnasioPanel from "@/components/gimnasio/GimnasioPanel";
 import PushButton from "@/components/notifications/PushButton";
 
@@ -29,6 +30,7 @@ export default async function GymPanelPage() {
         <GimnasioPanel
           tenantId={agent.tenant_id}
           puedeCobros={agent.role === "owner" || agent.gym_admin}
+          puedeRutinas={staffPuedeRutinas(agent.email)}
         />
       </div>
     </div>

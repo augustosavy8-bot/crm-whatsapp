@@ -86,18 +86,23 @@ function planLabel(p: Pick<GymPlan, "nombre" | "precio" | "dias_semana">): strin
 export default function GimnasioPanel({
   tenantId,
   puedeCobros = true,
+  puedeRutinas = false,
 }: {
   tenantId: string;
   // Acceso a cobros (socios y planes). Un profe "solo agenda" (sin gym_admin)
   // ve la agenda y los horarios, pero no los pagos ni los precios.
   puedeCobros?: boolean;
+  // Acceso a armar rutinas (en prueba: solo el staff habilitado).
+  puedeRutinas?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("agenda");
 
-  // Un profe sin cobros no ve las pestañas de plata.
-  const tabs = TABS.filter(
-    (t) => puedeCobros || (t.key !== "socios" && t.key !== "planes"),
-  );
+  // Filtra las pestañas según permisos: cobros (socios/planes) y rutinas.
+  const tabs = TABS.filter((t) => {
+    if (t.key === "socios" || t.key === "planes") return puedeCobros;
+    if (t.key === "rutinas") return puedeRutinas;
+    return true;
+  });
   const tabActual = tabs.some((t) => t.key === tab) ? tab : "agenda";
 
   return (
@@ -118,7 +123,7 @@ export default function GimnasioPanel({
       </div>
 
       {tabActual === "agenda" && <Agenda tenantId={tenantId} />}
-      {tabActual === "rutinas" && <Rutinas tenantId={tenantId} />}
+      {tabActual === "rutinas" && puedeRutinas && <Rutinas tenantId={tenantId} />}
       {tabActual === "socios" && puedeCobros && <Socios tenantId={tenantId} />}
       {tabActual === "planes" && puedeCobros && <Planes />}
       {tabActual === "horarios" && <Horarios tenantId={tenantId} />}
