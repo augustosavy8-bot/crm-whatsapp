@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
+import { rutinaHabilitadaParaAlumno } from "@/lib/gymRutinaPrueba";
 
 // El alumno registra lo que hizo de un ejercicio de su rutina (peso/reps del
 // día). alumno_id y tenant salen de la sesión — no se confían del cliente.
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
   const alumno = await getCurrentAlumno(supabase);
   if (!alumno) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+  // En prueba: rutinas habilitadas solo para el perfil de alumno permitido.
+  if (!rutinaHabilitadaParaAlumno(alumno.telefono)) {
+    return NextResponse.json({ error: "No habilitado" }, { status: 403 });
   }
 
   let body: Payload;

@@ -38,6 +38,7 @@ import {
   guardarRutinaAlumno,
   type RutinaDia,
 } from "@/lib/gymRutina";
+import { rutinaHabilitadaParaAlumno } from "@/lib/gymRutinaPrueba";
 import { normalizeArPhone } from "@/lib/phone";
 import { appBaseUrl } from "@/lib/appUrl";
 
@@ -2280,7 +2281,9 @@ function Rutinas({ tenantId }: { tenantId: string }) {
 
   // --- Selección de alumno ---
   if (!sel) {
-    const filtrados = alumnos.filter(
+    // En prueba: solo se puede armar la rutina del alumno habilitado.
+    const habilitados = alumnos.filter((a) => rutinaHabilitadaParaAlumno(a.telefono));
+    const filtrados = habilitados.filter(
       (a) =>
         !q.trim() ||
         a.nombre.toLowerCase().includes(q.toLowerCase()) ||
@@ -2290,6 +2293,9 @@ function Rutinas({ tenantId }: { tenantId: string }) {
       <div className="space-y-3">
         <p className="text-[13px] text-muted">
           Elegí un alumno para armar o editar su rutina.
+        </p>
+        <p className="rounded-lg bg-surface-2 px-3 py-2 text-[12px] text-muted">
+          En prueba: por ahora solo disponible para el alumno de prueba.
         </p>
         <input
           value={q}

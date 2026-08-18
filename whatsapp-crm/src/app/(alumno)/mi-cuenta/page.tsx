@@ -10,6 +10,7 @@ import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import MiRutina, { type UltimoLog } from "@/components/gimnasio/MiRutina";
 import type { RutinaDia } from "@/lib/gymRutina";
+import { rutinaHabilitadaParaAlumno } from "@/lib/gymRutinaPrueba";
 import CuotaAcciones from "@/components/gimnasio/CuotaAcciones";
 import InstruccionesInstalar from "@/components/gimnasio/InstruccionesInstalar";
 
@@ -77,29 +78,34 @@ export default async function MiCuentaPage() {
     (alPlan?.plan as unknown as { precio: number } | null)?.precio ?? null;
 
   // Rutina del alumno (si el staff le armó una) + último registro por ejercicio.
-  const { data: rutina } = await svc
-    .from("gym_rutinas")
-    .select("nombre, dias")
-    .eq("alumno_id", alumno.id)
-    .maybeSingle();
-
+  // En prueba: solo se muestra para el perfil de alumno habilitado.
   const ultimosLogs: Record<string, UltimoLog> = {};
-  if (rutina) {
-    const { data: logs } = await svc
-      .from("gym_rutina_logs")
-      .select("ejercicio_id, fecha, peso, reps, created_at")
+  let rutina: { nombre: string; dias: unknown } | null = null;
+  if (rutinaHabilitadaParaAlumno(alumno.telefono)) {
+    const { data } = await svc
+      .from("gym_rutinas")
+      .select("nombre, dias")
       .eq("alumno_id", alumno.id)
-      .order("fecha", { ascending: false })
-      .order("created_at", { ascending: false });
-    for (const l of (logs ?? []) as {
-      ejercicio_id: string;
-      fecha: string;
-      peso: string | null;
-      reps: string | null;
-    }[]) {
-      // El primero que aparece por ejercicio es el más reciente (orden desc).
-      if (!ultimosLogs[l.ejercicio_id]) {
-        ultimosLogs[l.ejercicio_id] = { fecha: l.fecha, peso: l.peso, reps: l.reps };
+      .maybeSingle();
+    rutina = data as { nombre: string; dias: unknown } | null;
+
+    if (rutina) {
+      const { data: logs } = await svc
+        .from("gym_rutina_logs")
+        .select("ejercicio_id, fecha, peso, reps, created_at")
+        .eq("alumno_id", alumno.id)
+        .order("fecha", { ascending: false })
+        .order("created_at", { ascending: false });
+      for (const l of (logs ?? []) as {
+        ejercicio_id: string;
+        fecha: string;
+        peso: string | null;
+        reps: string | null;
+      }[]) {
+        // El primero que aparece por ejercicio es el más reciente (orden desc).
+        if (!ultimosLogs[l.ejercicio_id]) {
+          ultimosLogs[l.ejercicio_id] = { fecha: l.fecha, peso: l.peso, reps: l.reps };
+        }
       }
     }
   }
