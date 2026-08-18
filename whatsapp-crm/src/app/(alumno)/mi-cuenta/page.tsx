@@ -8,6 +8,8 @@ import { cuotaPorVencer } from "@/lib/gymCuota";
 import { mpHabilitadoParaAlumno } from "@/lib/gymMpPrueba";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
+import MiRutina, { type UltimoLog } from "@/components/gimnasio/MiRutina";
+import type { RutinaDia } from "@/lib/gymRutina";
 import CuotaAcciones from "@/components/gimnasio/CuotaAcciones";
 import InstruccionesInstalar from "@/components/gimnasio/InstruccionesInstalar";
 
@@ -74,6 +76,34 @@ export default async function MiCuentaPage() {
   const montoARS =
     (alPlan?.plan as unknown as { precio: number } | null)?.precio ?? null;
 
+  // Rutina del alumno (si el staff le armó una) + último registro por ejercicio.
+  const { data: rutina } = await svc
+    .from("gym_rutinas")
+    .select("nombre, dias")
+    .eq("alumno_id", alumno.id)
+    .maybeSingle();
+
+  const ultimosLogs: Record<string, UltimoLog> = {};
+  if (rutina) {
+    const { data: logs } = await svc
+      .from("gym_rutina_logs")
+      .select("ejercicio_id, fecha, peso, reps, created_at")
+      .eq("alumno_id", alumno.id)
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false });
+    for (const l of (logs ?? []) as {
+      ejercicio_id: string;
+      fecha: string;
+      peso: string | null;
+      reps: string | null;
+    }[]) {
+      // El primero que aparece por ejercicio es el más reciente (orden desc).
+      if (!ultimosLogs[l.ejercicio_id]) {
+        ultimosLogs[l.ejercicio_id] = { fecha: l.fecha, peso: l.peso, reps: l.reps };
+      }
+    }
+  }
+
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-6 sm:pt-8">
       <div className="mb-5 space-y-4">
@@ -100,6 +130,14 @@ export default async function MiCuentaPage() {
         />
       ) : (
         <CompletarTelefono />
+      )}
+
+      {rutina && (
+        <MiRutina
+          nombre={(rutina.nombre as string) ?? "Rutina"}
+          dias={((rutina.dias as unknown as RutinaDia[]) ?? [])}
+          ultimos={ultimosLogs}
+        />
       )}
 
       <InstruccionesInstalar />

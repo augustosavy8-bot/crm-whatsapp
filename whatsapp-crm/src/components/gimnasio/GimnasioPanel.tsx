@@ -33,6 +33,11 @@ import {
 } from "@/lib/gymCupoAdmin";
 import { hoyISOArgentina, sumarDiasISO } from "@/lib/tz";
 import { cuotaProporcional, proximoVencimientoISO } from "@/lib/gymCuota";
+import {
+  getRutinaAlumno,
+  guardarRutinaAlumno,
+  type RutinaDia,
+} from "@/lib/gymRutina";
 import { normalizeArPhone } from "@/lib/phone";
 import { appBaseUrl } from "@/lib/appUrl";
 
@@ -61,6 +66,7 @@ function fechaTitulo(iso: string): string {
 
 const TABS = [
   { key: "agenda", label: "Agenda" },
+  { key: "rutinas", label: "Rutinas" },
   { key: "socios", label: "Socios" },
   { key: "planes", label: "Planes" },
   { key: "horarios", label: "Horarios" },
@@ -111,6 +117,7 @@ export default function GimnasioPanel({
       </div>
 
       {tabActual === "agenda" && <Agenda tenantId={tenantId} />}
+      {tabActual === "rutinas" && <Rutinas tenantId={tenantId} />}
       {tabActual === "socios" && puedeCobros && <Socios tenantId={tenantId} />}
       {tabActual === "planes" && puedeCobros && <Planes />}
       {tabActual === "horarios" && <Horarios tenantId={tenantId} />}
@@ -2136,6 +2143,313 @@ function Socios({ tenantId }: { tenantId: string }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Tab Rutinas: el staff arma la rutina estructurada de un alumno.
+// ------------------------------------------------------------
+function nuevoEjercicio(): RutinaDia["ejercicios"][number] {
+  return {
+    id: crypto.randomUUID(),
+    nombre: "",
+    series: "",
+    reps: "",
+    peso: "",
+    descanso: "",
+    nota: "",
+  };
+}
+
+function Rutinas({ tenantId }: { tenantId: string }) {
+  const sb = useMemo(() => createClient(), []);
+  const [alumnos, setAlumnos] = useState<GymSocio[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+
+  const [sel, setSel] = useState<GymSocio | null>(null);
+  const [nombre, setNombre] = useState("Rutina");
+  const [dias, setDias] = useState<RutinaDia[]>([]);
+  const [abriendo, setAbriendo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setAlumnos(await getGymAlumnos(sb));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo cargar.");
+      } finally {
+        setCargando(false);
+      }
+    })();
+  }, [sb]);
+
+  async function elegir(a: GymSocio) {
+    setError(null);
+    setOkMsg(null);
+    setAbriendo(true);
+    try {
+      const r = await getRutinaAlumno(sb, a.id);
+      setNombre(r?.nombre ?? "Rutina");
+      setDias(r?.dias ?? []);
+      setSel(a);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo abrir la rutina.");
+    } finally {
+      setAbriendo(false);
+    }
+  }
+
+  function volver() {
+    setSel(null);
+    setDias([]);
+    setNombre("Rutina");
+    setOkMsg(null);
+    setError(null);
+  }
+
+  const setDia = (id: string, patch: Partial<RutinaDia>) =>
+    setDias((ds) => ds.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  const addDia = () =>
+    setDias((ds) => [
+      ...ds,
+      { id: crypto.randomUUID(), nombre: `Día ${ds.length + 1}`, ejercicios: [] },
+    ]);
+  const delDia = (id: string) => setDias((ds) => ds.filter((d) => d.id !== id));
+  const addEj = (diaId: string) =>
+    setDias((ds) =>
+      ds.map((d) =>
+        d.id === diaId ? { ...d, ejercicios: [...d.ejercicios, nuevoEjercicio()] } : d,
+      ),
+    );
+  const delEj = (diaId: string, ejId: string) =>
+    setDias((ds) =>
+      ds.map((d) =>
+        d.id === diaId
+          ? { ...d, ejercicios: d.ejercicios.filter((e) => e.id !== ejId) }
+          : d,
+      ),
+    );
+  const setEj = (
+    diaId: string,
+    ejId: string,
+    campo: keyof RutinaDia["ejercicios"][number],
+    valor: string,
+  ) =>
+    setDias((ds) =>
+      ds.map((d) =>
+        d.id === diaId
+          ? {
+              ...d,
+              ejercicios: d.ejercicios.map((e) =>
+                e.id === ejId ? { ...e, [campo]: valor } : e,
+              ),
+            }
+          : d,
+      ),
+    );
+
+  async function guardar() {
+    if (!sel) return;
+    setError(null);
+    setOkMsg(null);
+    setGuardando(true);
+    try {
+      await guardarRutinaAlumno(sb, {
+        tenantId,
+        alumnoId: sel.id,
+        nombre,
+        dias,
+      });
+      setOkMsg("Rutina guardada. El alumno ya la ve en su cuenta.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  const input =
+    "rounded-lg border border-line bg-surface-2 px-3 py-2 text-[14px] text-ink outline-none focus:border-accent";
+  const mini =
+    "min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent";
+
+  // --- Selección de alumno ---
+  if (!sel) {
+    const filtrados = alumnos.filter(
+      (a) =>
+        !q.trim() ||
+        a.nombre.toLowerCase().includes(q.toLowerCase()) ||
+        (a.telefono ?? "").includes(q),
+    );
+    return (
+      <div className="space-y-3">
+        <p className="text-[13px] text-muted">
+          Elegí un alumno para armar o editar su rutina.
+        </p>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por nombre o WhatsApp…"
+          className={`${input} w-full`}
+        />
+        {error && <p className="text-[13px] text-danger">{error}</p>}
+        {cargando ? (
+          <p className="py-8 text-center text-sm text-muted">Cargando…</p>
+        ) : filtrados.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted">Sin resultados.</p>
+        ) : (
+          <div className="space-y-2">
+            {filtrados.slice(0, 40).map((a) => (
+              <button
+                key={a.id}
+                onClick={() => elegir(a)}
+                disabled={abriendo}
+                className="flex w-full items-center justify-between gap-3 rounded-card border border-line bg-surface p-3 text-left shadow-card hover:border-accent disabled:opacity-50"
+              >
+                <div>
+                  <div className="text-[14px] font-bold">{a.nombre}</div>
+                  <div className="text-[12px] text-muted">{a.telefono ?? "sin WhatsApp"}</div>
+                </div>
+                <span className="shrink-0 text-[12px] font-semibold text-accent">
+                  Rutina →
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Editor de rutina ---
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={volver}
+          className="text-[13px] font-semibold text-accent hover:brightness-90"
+        >
+          ← Volver
+        </button>
+        <span className="text-[13px] font-bold">{sel.nombre}</span>
+      </div>
+
+      <div className="space-y-2 rounded-panel border border-line bg-surface p-4 shadow-card">
+        <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+          Nombre de la rutina
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            className={input}
+          />
+        </label>
+      </div>
+
+      {dias.map((d, i) => (
+        <div
+          key={d.id}
+          className="space-y-3 rounded-panel border border-line bg-surface p-4 shadow-card"
+        >
+          <div className="flex items-center gap-2">
+            <input
+              value={d.nombre}
+              onChange={(e) => setDia(d.id, { nombre: e.target.value })}
+              placeholder={`Día ${i + 1}`}
+              className={`${input} min-w-0 flex-1 font-bold`}
+            />
+            <button
+              onClick={() => delDia(d.id)}
+              className="shrink-0 text-[12px] font-semibold text-muted hover:text-danger"
+            >
+              Quitar día
+            </button>
+          </div>
+
+          {d.ejercicios.map((e) => (
+            <div key={e.id} className="space-y-1.5 rounded-card border border-line bg-surface-2 p-2.5">
+              <div className="flex items-center gap-2">
+                <input
+                  value={e.nombre}
+                  onChange={(ev) => setEj(d.id, e.id, "nombre", ev.target.value)}
+                  placeholder="Ejercicio (ej. Sentadilla)"
+                  className={`${mini} flex-1 font-semibold`}
+                />
+                <button
+                  onClick={() => delEj(d.id, e.id)}
+                  aria-label="Quitar ejercicio"
+                  className="shrink-0 px-1 text-[13px] text-faint hover:text-danger"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                <input
+                  value={e.series}
+                  onChange={(ev) => setEj(d.id, e.id, "series", ev.target.value)}
+                  placeholder="Series"
+                  className={mini}
+                />
+                <input
+                  value={e.reps}
+                  onChange={(ev) => setEj(d.id, e.id, "reps", ev.target.value)}
+                  placeholder="Reps"
+                  className={mini}
+                />
+                <input
+                  value={e.peso}
+                  onChange={(ev) => setEj(d.id, e.id, "peso", ev.target.value)}
+                  placeholder="Peso"
+                  className={mini}
+                />
+                <input
+                  value={e.descanso}
+                  onChange={(ev) => setEj(d.id, e.id, "descanso", ev.target.value)}
+                  placeholder="Descanso"
+                  className={mini}
+                />
+              </div>
+              <input
+                value={e.nota}
+                onChange={(ev) => setEj(d.id, e.id, "nota", ev.target.value)}
+                placeholder="Nota (opcional)"
+                className={`${mini} w-full`}
+              />
+            </div>
+          ))}
+
+          <button
+            onClick={() => addEj(d.id)}
+            className="text-[13px] font-semibold text-accent hover:brightness-90"
+          >
+            + Agregar ejercicio
+          </button>
+        </div>
+      ))}
+
+      <button
+        onClick={addDia}
+        className="w-full rounded-panel border border-dashed border-line py-3 text-[13px] font-semibold text-muted hover:border-accent hover:text-ink"
+      >
+        + Agregar día
+      </button>
+
+      {error && <p className="text-[13px] text-danger">{error}</p>}
+      {okMsg && <p className="text-[13px] text-ok">{okMsg}</p>}
+
+      <div className="sticky bottom-2 flex justify-end">
+        <button
+          onClick={guardar}
+          disabled={guardando}
+          className="rounded-full bg-accent px-6 py-2.5 text-[14px] font-bold text-white shadow-pop disabled:opacity-50"
+        >
+          {guardando ? "Guardando…" : "Guardar rutina"}
+        </button>
+      </div>
     </div>
   );
 }
