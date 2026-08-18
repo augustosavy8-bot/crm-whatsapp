@@ -67,33 +67,35 @@ export async function POST(request: NextRequest) {
   }
 
   // Teléfono: si la ficha ya tenía uno, se respeta. Si no (socios del padrón
-  // importado), el alumno lo cargó en el registro y es obligatorio — lo
-  // necesita para reservar (el cupo se maneja por teléfono).
+  // importado), el alumno lo puede cargar pero es OPCIONAL: se lo pedimos
+  // después, cuando quiera reservar (el cupo se maneja por teléfono).
   const telActual = (alumno.telefono as string | null)?.trim() ?? "";
-  let telefonoFinal = telActual;
+  let telefonoFinal: string | null = telActual || null;
   if (!telActual) {
     const t = (body.telefono ?? "").trim();
-    if (t.replace(/\D/g, "").length < 8) {
-      return NextResponse.json(
-        { error: "Ingresá un WhatsApp válido." },
-        { status: 400 },
-      );
+    if (t) {
+      if (t.replace(/\D/g, "").length < 8) {
+        return NextResponse.json(
+          { error: "Ingresá un WhatsApp válido (o dejalo vacío)." },
+          { status: 400 },
+        );
+      }
+      // No puede pisar el teléfono de otra ficha del mismo gimnasio (índice único).
+      const { data: dup } = await sb
+        .from("gym_alumnos")
+        .select("id")
+        .eq("tenant_id", alumno.tenant_id as string)
+        .eq("telefono", t)
+        .neq("id", alumno.id)
+        .maybeSingle();
+      if (dup) {
+        return NextResponse.json(
+          { error: "Ese WhatsApp ya está registrado con otra ficha. Avisá al gimnasio." },
+          { status: 409 },
+        );
+      }
+      telefonoFinal = t;
     }
-    // No puede pisar el teléfono de otra ficha del mismo gimnasio (índice único).
-    const { data: dup } = await sb
-      .from("gym_alumnos")
-      .select("id")
-      .eq("tenant_id", alumno.tenant_id as string)
-      .eq("telefono", t)
-      .neq("id", alumno.id)
-      .maybeSingle();
-    if (dup) {
-      return NextResponse.json(
-        { error: "Ese WhatsApp ya está registrado con otra ficha. Avisá al gimnasio." },
-        { status: 409 },
-      );
-    }
-    telefonoFinal = t;
   }
 
   // Crea la cuenta ya confirmada.

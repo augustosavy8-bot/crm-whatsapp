@@ -6,8 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 
 // Formulario de registro por invitación. El nombre viene de la ficha (bloqueado).
 // El WhatsApp también, SALVO que la ficha no tenga (socios del padrón importado):
-// ahí el alumno lo carga y es obligatorio. Define email + contraseña. Tras crear
-// la cuenta, inicia sesión y cae en su panel.
+// ahí el alumno lo puede cargar, pero es OPCIONAL (después se lo pedimos si
+// quiere reservar). Define email + contraseña. Tras crear la cuenta, inicia
+// sesión y cae en su panel.
 export default function RegistroForm({
   token,
   nombre,
@@ -74,20 +75,27 @@ export default function RegistroForm({
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-muted">WhatsApp</label>
+        <label className="text-xs font-semibold text-muted">
+          WhatsApp{telBloqueado ? "" : " (opcional)"}
+        </label>
         {telBloqueado ? (
           <div className={locked}>{telFicha}</div>
         ) : (
-          <input
-            type="tel"
-            required
-            inputMode="tel"
-            autoComplete="tel"
-            value={tel}
-            onChange={(e) => setTel(e.target.value)}
-            className={input}
-            placeholder="Tu número de WhatsApp"
-          />
+          <>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={tel}
+              onChange={(e) => setTel(e.target.value)}
+              className={input}
+              placeholder="Tu número de WhatsApp"
+            />
+            <p className="text-[11px] text-faint">
+              Podés dejarlo vacío ahora; te lo vamos a pedir cuando quieras
+              reservar una clase.
+            </p>
+          </>
         )}
       </div>
 
