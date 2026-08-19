@@ -8,6 +8,7 @@
 // (o vaciar el set y cambiar la condición).
 const TELEFONOS_PRUEBA_RUTINA = new Set<string>([
   "3471538679", // Augusto Savy (alumno de prueba)
+  "3471506063", // Serafin Savy
 ]);
 
 export function rutinaHabilitadaParaAlumno(telefono: string | null): boolean {
