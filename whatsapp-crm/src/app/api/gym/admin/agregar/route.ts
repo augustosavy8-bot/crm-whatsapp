@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAgent, esGymStaff } from "@/lib/agent";
 import { anotarFijo, reservarSuelta } from "@/lib/gymCupo";
 import { normalizeArPhone } from "@/lib/phone";
@@ -77,11 +78,20 @@ export async function POST(request: NextRequest) {
   try {
     // Alta del staff: las reservas ya entran confirmadas (el RPC lo hace), y es
     // un OVERRIDE del bloqueo por deuda — el admin puede anotar a quien quiera.
-    if (tipo === "suelta") {
-      const id = await reservarSuelta({ horarioId, fecha, nombre, telefono });
-      return NextResponse.json({ ok: true, tipo, id });
-    }
-    const id = await anotarFijo({ horarioId, fechaDesde: fecha, nombre, telefono });
+    const id =
+      tipo === "suelta"
+        ? await reservarSuelta({ horarioId, fecha, nombre, telefono })
+        : await anotarFijo({ horarioId, fechaDesde: fecha, nombre, telefono });
+
+    // La persona que anota el staff a mano es socia del gym (deja de figurar
+    // "No socio"). El pago se registra aparte. Dedup por teléfono o por nombre.
+    const svc = createServiceClient();
+    const upd = svc
+      .from("gym_alumnos")
+      .update({ es_socio: true })
+      .eq("tenant_id", agent.tenant_id);
+    await (telefono ? upd.eq("telefono", telefono) : upd.ilike("nombre", nombre));
+
     return NextResponse.json({ ok: true, tipo, id });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "No se pudo agregar.";

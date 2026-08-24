@@ -201,6 +201,24 @@ export async function registrarPagoGym(
   return data as GymPago;
 }
 
+// Revierte un pago: lo borra del libro y recalcula el vencimiento del socio.
+export async function revertirPago(
+  sb: SupabaseClient,
+  pagoId: string,
+): Promise<void> {
+  const { error } = await sb.rpc("gym_revertir_pago", { p_pago_id: pagoId });
+  if (error) throw error;
+}
+
+// Elimina un socio de la lista (borra su ficha y todo lo asociado).
+export async function eliminarSocio(
+  sb: SupabaseClient,
+  alumnoId: string,
+): Promise<void> {
+  const { error } = await sb.rpc("gym_eliminar_alumno", { p_alumno_id: alumnoId });
+  if (error) throw error;
+}
+
 // Historial de pagos de un socio (el más reciente primero).
 export async function getPagosSocio(
   sb: SupabaseClient,

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Toast } from "@/components/turnos/Toast";
 import {
   crearGymHorario,
+  eliminarSocio,
   getAsistencias,
   getDeudaResumen,
   getDiasCerrados,
@@ -18,6 +19,7 @@ import {
   marcarDiaCerrado,
   quitarDiaCerrado,
   registrarPagoGym,
+  revertirPago,
   setGymHorarioActivo,
   updateGymSocio,
   type AsistenciaEstado,
@@ -1513,6 +1515,53 @@ function Socios({ tenantId }: { tenantId: string }) {
     }
   }
 
+  // Revierte un pago: lo borra del libro y recalcula la cuota del socio con lo
+  // que devuelve el server (el vencimiento del pago anterior que quede).
+  async function revertir(s: GymSocio, pago: GymPago) {
+    if (!confirm("¿Revertir este pago? Se borra del registro y la cuota vuelve atrás.")) return;
+    setError(null);
+    try {
+      await revertirPago(sb, pago.id);
+      // Saco el pago del historial local.
+      setPagosPorSocio((prev) =>
+        prev[s.id]
+          ? { ...prev, [s.id]: prev[s.id].filter((p) => p.id !== pago.id) }
+          : prev,
+      );
+      // Recalculo la cuota de la tarjeta: el vencimiento del último pago que queda.
+      setPagosPorSocio((prev) => {
+        const rest = prev[s.id] ?? [];
+        const nuevaCuota =
+          rest.map((p) => p.cuota_hasta).filter(Boolean).sort().at(-1) ?? null;
+        setSocios((ps) =>
+          ps.map((x) => (x.id === s.id ? { ...x, cuota_hasta: nuevaCuota } : x)),
+        );
+        return prev;
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo revertir el pago.");
+    }
+  }
+
+  // Elimina un socio de la lista (borra su ficha y todo lo asociado).
+  async function eliminar(s: GymSocio) {
+    if (
+      !confirm(
+        `¿Eliminar a ${s.nombre} de la lista? Se borra su ficha y sus reservas. No se puede deshacer.`,
+      )
+    )
+      return;
+    setError(null);
+    const previo = socios;
+    setSocios((prev) => prev.filter((x) => x.id !== s.id)); // optimista
+    try {
+      await eliminarSocio(sb, s.id);
+    } catch (e) {
+      setSocios(previo); // revierto
+      setError(e instanceof Error ? e.message : "No se pudo eliminar.");
+    }
+  }
+
   async function setMetodo(s: GymSocio, metodo: "efectivo" | "mercadopago") {
     const previo = s.metodo_pago;
     setError(null);
@@ -2057,6 +2106,12 @@ function Socios({ tenantId }: { tenantId: string }) {
                                   → {fechaCorta(p.cuota_hasta)}
                                 </span>
                               )}
+                              <button
+                                onClick={() => revertir(s, p)}
+                                className="text-[11px] font-semibold text-danger hover:brightness-90"
+                              >
+                                Revertir
+                              </button>
                             </div>
                           </li>
                         ))}
@@ -2143,6 +2198,16 @@ function Socios({ tenantId }: { tenantId: string }) {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Eliminar socio de la lista */}
+                <div className="mt-2 border-t border-line pt-2 text-right">
+                  <button
+                    onClick={() => eliminar(s)}
+                    className="text-[11px] font-semibold text-faint hover:text-danger"
+                  >
+                    Eliminar socio
+                  </button>
                 </div>
               </div>
             );
