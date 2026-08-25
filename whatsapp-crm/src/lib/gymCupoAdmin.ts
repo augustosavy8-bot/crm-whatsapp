@@ -148,7 +148,10 @@ export async function updateGymSocio(
   sb: SupabaseClient,
   id: string,
   patch: Partial<
-    Pick<GymSocio, "es_socio" | "cuota_hasta" | "metodo_pago" | "email">
+    Pick<
+      GymSocio,
+      "es_socio" | "cuota_hasta" | "metodo_pago" | "email" | "nombre" | "telefono"
+    >
   >,
 ): Promise<void> {
   const { error } = await sb.from("gym_alumnos").update(patch).eq("id", id);

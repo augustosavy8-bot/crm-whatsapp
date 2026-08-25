@@ -1292,9 +1292,12 @@ function Socios({ tenantId }: { tenantId: string }) {
   // Links de recuperación de contraseña generados en esta sesión, por socio.
   const [recuperLinks, setRecuperLinks] = useState<Record<string, string>>({});
   const [copiado, setCopiado] = useState<string | null>(null);
-  // Edición inline del email por socio (necesario para MercadoPago).
-  const [editEmailId, setEditEmailId] = useState<string | null>(null);
-  const [emailVal, setEmailVal] = useState("");
+  // Edición de datos del socio (nombre / WhatsApp / email).
+  const [editId, setEditId] = useState<string | null>(null);
+  const [edNombre, setEdNombre] = useState("");
+  const [edTel, setEdTel] = useState("");
+  const [edEmail, setEdEmail] = useState("");
+  const [edGuardando, setEdGuardando] = useState(false);
   // Registro de pagos (libro por socio): historial cargado y cuál está abierto.
   const [pagosPorSocio, setPagosPorSocio] = useState<Record<string, GymPago[]>>({});
   const [pagosAbierto, setPagosAbierto] = useState<string | null>(null);
@@ -1351,14 +1354,54 @@ function Socios({ tenantId }: { tenantId: string }) {
     }
   }
 
-  async function guardarEmail(s: GymSocio) {
+  function abrirEditar(s: GymSocio) {
     setError(null);
+    setEditId(s.id);
+    setEdNombre(s.nombre);
+    setEdTel(s.telefono ?? "");
+    setEdEmail(s.email ?? "");
+  }
+
+  async function guardarDatos(s: GymSocio) {
+    setError(null);
+    if (!edNombre.trim()) {
+      setError("El nombre no puede quedar vacío.");
+      return;
+    }
+    // WhatsApp opcional; si lo cargan, se normaliza y valida.
+    let tel: string | null = null;
+    if (edTel.trim()) {
+      tel = normalizeArPhone(edTel.trim());
+      if (tel.length < 10) {
+        setError("WhatsApp inválido (o dejalo vacío).");
+        return;
+      }
+    }
+    setEdGuardando(true);
     try {
-      await updateGymSocio(sb, s.id, { email: emailVal.trim() || null });
-      setEditEmailId(null);
-      cargar();
+      await updateGymSocio(sb, s.id, {
+        nombre: edNombre.trim(),
+        telefono: tel,
+        email: edEmail.trim() || null,
+      });
+      // Actualizo la tarjeta en el momento, sin recargar toda la lista.
+      setSocios((prev) =>
+        prev.map((x) =>
+          x.id === s.id
+            ? { ...x, nombre: edNombre.trim(), telefono: tel, email: edEmail.trim() || null }
+            : x,
+        ),
+      );
+      setEditId(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar el email.");
+      const msg = e instanceof Error ? e.message : "No se pudo guardar.";
+      setError(
+        /duplicate|unique/i.test(msg)
+          ? "Ese WhatsApp ya está en otra ficha."
+          : msg,
+      );
+    } finally {
+      setEdGuardando(false);
     }
   }
 
@@ -1796,8 +1839,20 @@ function Socios({ tenantId }: { tenantId: string }) {
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-[14px] font-bold">{s.nombre}</div>
-                    <div className="text-[12px] text-muted">{s.telefono}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-[14px] font-bold">{s.nombre}</div>
+                      <button
+                        onClick={() =>
+                          editId === s.id ? setEditId(null) : abrirEditar(s)
+                        }
+                        className="text-[11px] font-semibold text-accent hover:brightness-90"
+                      >
+                        {editId === s.id ? "Cerrar" : "Editar"}
+                      </button>
+                    </div>
+                    <div className="text-[12px] text-muted">
+                      {s.telefono ?? "sin WhatsApp"}
+                    </div>
                   </div>
                   <span
                     className={[
@@ -1818,6 +1873,57 @@ function Socios({ tenantId }: { tenantId: string }) {
                         : "No socio"}
                   </span>
                 </div>
+
+                {/* Editar datos del socio (nombre / WhatsApp / email) */}
+                {editId === s.id && (
+                  <div className="mt-2 space-y-2 rounded-lg border border-line bg-surface-2 p-3">
+                    <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+                      Nombre
+                      <input
+                        value={edNombre}
+                        onChange={(e) => setEdNombre(e.target.value)}
+                        className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <label className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-muted">
+                        WhatsApp
+                        <input
+                          value={edTel}
+                          onChange={(e) => setEdTel(e.target.value)}
+                          inputMode="tel"
+                          placeholder="opcional"
+                          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                        />
+                      </label>
+                      <label className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] font-semibold text-muted">
+                        Email
+                        <input
+                          type="email"
+                          value={edEmail}
+                          onChange={(e) => setEdEmail(e.target.value)}
+                          placeholder="opcional"
+                          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => guardarDatos(s)}
+                        disabled={edGuardando}
+                        className="rounded-full bg-accent px-4 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+                      >
+                        {edGuardando ? "Guardando…" : "Guardar"}
+                      </button>
+                      <button
+                        onClick={() => setEditId(null)}
+                        className="text-[12px] font-semibold text-muted"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Saldo: si debe meses, chip que abre el detalle exacto. */}
                 {mesesDebe && mesesDebe.length > 0 && (
@@ -1883,49 +1989,10 @@ function Socios({ tenantId }: { tenantId: string }) {
                   )}
                 </div>
 
-                {/* Email (lo usa MercadoPago como pagador) */}
+                {/* Email (lo usa MercadoPago como pagador). Se edita con "Editar". */}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="text-[12px] font-semibold text-muted">
-                    Email
-                  </span>
-                  {editEmailId === s.id ? (
-                    <>
-                      <input
-                        type="email"
-                        value={emailVal}
-                        onChange={(e) => setEmailVal(e.target.value)}
-                        placeholder="email@ejemplo.com"
-                        className="min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-2 py-1 text-[12px] text-ink outline-none focus:border-accent"
-                      />
-                      <button
-                        onClick={() => guardarEmail(s)}
-                        className="rounded-full bg-ink px-3 py-1 text-[11px] font-bold text-white"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        onClick={() => setEditEmailId(null)}
-                        className="text-[11px] font-semibold text-muted"
-                      >
-                        Cancelar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[12px] text-muted">
-                        {s.email || "—"}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setEditEmailId(s.id);
-                          setEmailVal(s.email ?? "");
-                        }}
-                        className="text-[11px] font-semibold text-accent hover:brightness-90"
-                      >
-                        Editar
-                      </button>
-                    </>
-                  )}
+                  <span className="text-[12px] font-semibold text-muted">Email</span>
+                  <span className="text-[12px] text-muted">{s.email || "—"}</span>
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
