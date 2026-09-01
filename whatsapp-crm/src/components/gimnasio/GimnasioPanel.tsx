@@ -1283,6 +1283,7 @@ function Socios({ tenantId }: { tenantId: string }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [soloVencidas, setSoloVencidas] = useState(false);
 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -1705,7 +1706,13 @@ function Socios({ tenantId }: { tenantId: string }) {
     }
   }
 
-  const filtrados = socios.filter(
+  // Socios que deben la cuota (socios con vencimiento pasado o sin pago).
+  const vencidos = socios.filter(
+    (s) => s.es_socio && cuotaVencida(s.es_socio, s.cuota_hasta),
+  );
+
+  const base = soloVencidas ? vencidos : socios;
+  const filtrados = base.filter(
     (s) =>
       !q.trim() ||
       s.nombre.toLowerCase().includes(q.toLowerCase()) ||
@@ -1804,6 +1811,28 @@ function Socios({ tenantId }: { tenantId: string }) {
         </div>
       )}
 
+      {/* Filtro: todos / solo los que deben la cuota */}
+      <div className="flex rounded-full bg-surface-2 p-1">
+        <button
+          onClick={() => setSoloVencidas(false)}
+          className={[
+            "flex-1 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors",
+            !soloVencidas ? "bg-ink text-white" : "text-muted hover:text-ink",
+          ].join(" ")}
+        >
+          Todos ({socios.length})
+        </button>
+        <button
+          onClick={() => setSoloVencidas(true)}
+          className={[
+            "flex-1 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors",
+            soloVencidas ? "bg-danger text-white" : "text-muted hover:text-ink",
+          ].join(" ")}
+        >
+          Cuotas vencidas ({vencidos.length})
+        </button>
+      </div>
+
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -1819,7 +1848,9 @@ function Socios({ tenantId }: { tenantId: string }) {
         <p className="py-4 text-center text-sm text-muted">
           {socios.length === 0
             ? "Todavía no hay alumnos. Aparecen acá cuando reservan, o agregalos arriba."
-            : "Sin resultados."}
+            : soloVencidas && !q.trim()
+              ? "No hay cuotas vencidas 🎉"
+              : "Sin resultados."}
         </p>
       ) : (
         <div className="space-y-2">
