@@ -1298,6 +1298,7 @@ function Socios({ tenantId }: { tenantId: string }) {
   const [edNombre, setEdNombre] = useState("");
   const [edTel, setEdTel] = useState("");
   const [edEmail, setEdEmail] = useState("");
+  const [edInicio, setEdInicio] = useState("");
   const [edGuardando, setEdGuardando] = useState(false);
   // Registro de pagos (libro por socio): historial cargado y cuál está abierto.
   const [pagosPorSocio, setPagosPorSocio] = useState<Record<string, GymPago[]>>({});
@@ -1361,6 +1362,7 @@ function Socios({ tenantId }: { tenantId: string }) {
     setEdNombre(s.nombre);
     setEdTel(s.telefono ?? "");
     setEdEmail(s.email ?? "");
+    setEdInicio(s.fecha_inicio ?? "");
   }
 
   async function guardarDatos(s: GymSocio) {
@@ -1384,12 +1386,19 @@ function Socios({ tenantId }: { tenantId: string }) {
         nombre: edNombre.trim(),
         telefono: tel,
         email: edEmail.trim() || null,
+        fecha_inicio: edInicio || null,
       });
       // Actualizo la tarjeta en el momento, sin recargar toda la lista.
       setSocios((prev) =>
         prev.map((x) =>
           x.id === s.id
-            ? { ...x, nombre: edNombre.trim(), telefono: tel, email: edEmail.trim() || null }
+            ? {
+                ...x,
+                nombre: edNombre.trim(),
+                telefono: tel,
+                email: edEmail.trim() || null,
+                fecha_inicio: edInicio || null,
+              }
             : x,
         ),
       );
@@ -1938,6 +1947,15 @@ function Socios({ tenantId }: { tenantId: string }) {
                         />
                       </label>
                     </div>
+                    <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
+                      Día de inicio
+                      <input
+                        type="date"
+                        value={edInicio}
+                        onChange={(e) => setEdInicio(e.target.value)}
+                        className="w-40 rounded-lg border border-line bg-surface px-2 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                      />
+                    </label>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => guardarDatos(s)}
@@ -2024,6 +2042,14 @@ function Socios({ tenantId }: { tenantId: string }) {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="text-[12px] font-semibold text-muted">Email</span>
                   <span className="text-[12px] text-muted">{s.email || "—"}</span>
+                </div>
+
+                {/* Día de inicio (lo carga el profe con "Editar"). */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-semibold text-muted">Inicio</span>
+                  <span className="text-[12px] text-muted">
+                    {s.fecha_inicio ? fechaCorta(s.fecha_inicio) : "— (cargalo en Editar)"}
+                  </span>
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">

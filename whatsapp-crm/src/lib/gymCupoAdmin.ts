@@ -49,6 +49,7 @@ export interface GymSocio {
   email: string | null;
   es_socio: boolean;
   cuota_hasta: string | null;
+  fecha_inicio: string | null; // día de alta del socio (lo carga el profe)
   metodo_pago: "efectivo" | "mercadopago";
   created_at: string;
   auth_user_id: string | null; // tiene cuenta de login
@@ -137,7 +138,7 @@ export async function getGymAlumnos(sb: SupabaseClient): Promise<GymSocio[]> {
   const { data, error } = await sb
     .from("gym_alumnos")
     .select(
-      "id, nombre, telefono, email, es_socio, cuota_hasta, metodo_pago, created_at, auth_user_id, invite_token, invite_expires_at, plan_id, plan:gym_planes(id, nombre, precio, dias_semana)",
+      "id, nombre, telefono, email, es_socio, cuota_hasta, fecha_inicio, metodo_pago, created_at, auth_user_id, invite_token, invite_expires_at, plan_id, plan:gym_planes(id, nombre, precio, dias_semana)",
     )
     .order("nombre", { ascending: true });
   if (error) throw error;
@@ -150,7 +151,13 @@ export async function updateGymSocio(
   patch: Partial<
     Pick<
       GymSocio,
-      "es_socio" | "cuota_hasta" | "metodo_pago" | "email" | "nombre" | "telefono"
+      | "es_socio"
+      | "cuota_hasta"
+      | "fecha_inicio"
+      | "metodo_pago"
+      | "email"
+      | "nombre"
+      | "telefono"
     >
   >,
 ): Promise<void> {
