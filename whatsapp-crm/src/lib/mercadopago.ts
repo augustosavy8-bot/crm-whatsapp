@@ -5,12 +5,17 @@ import crypto from "node:crypto";
 // (Checkout Pro). El socio paga su mes desde la app y lo redirige a MercadoPago.
 // No hay débito automático / suscripciones. REST directo, sin SDK.
 //
-// TODO(cuenta MP): cablear las env vars cuando el gimnasio tenga su cuenta:
-//   MP_ACCESS_TOKEN     access token de PRODUCCIÓN (o TEST para probar)
+// Env vars que usa hoy (cuenta única):
+//   MP_ACCESS_TOKEN     access token del vendedor (PRODUCCIÓN o TEST)
 //   MP_WEBHOOK_SECRET   "clave secreta" del webhook (para validar la firma)
 // El monto de la cuota NO es una env var: sale del precio del plan del socio
 // (tabla gym_planes). Mientras no haya token, mpConfigurado() es false y todo
 // el flujo queda apagado sin romper nada.
+//
+// NOTA (conversión a marketplace, en curso): en las próximas fases el cobro
+// pasa a usar el access token del GYM obtenido por OAuth y una comisión de
+// plataforma (marketplace_fee). Cuando eso esté activo, MP_ACCESS_TOKEN queda
+// como legacy y se deja de usar para cobrar. Ver LEARNING.md / TESTING.md.
 // ============================================================
 
 const MP_API = "https://api.mercadopago.com";

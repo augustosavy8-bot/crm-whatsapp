@@ -8,7 +8,8 @@ Supabase + Tailwind v4 + TypeScript, deploy en Vercel.
 - **Turnos** de los profesionales (agenda, reserva pública, confirmación, drag&drop).
 - **Clases del gimnasio** con cupo (reserva suelta o fija, cupo por horario).
 - **Alumnos**: alta, invitación por link, panel propio (`/mi-cuenta`), estado de cuota.
-- **Cuotas / planes**: precios por plan, MercadoPago (débito automático) opcional.
+- **Cuotas / planes**: precios por plan, pago de cuota con MercadoPago (Checkout
+  Pro, pago único) opcional. En conversión a marketplace (OAuth + split).
 - **Notificaciones**: Web Push al staff (reserva nueva) y al alumno (reserva
   confirmada), realtime en el panel. Los avisos por WhatsApp son manuales.
 - **Multi-tenant** con RLS: cada dato queda sellado por `tenant_id` + rol vía los
@@ -34,8 +35,10 @@ cp .env.local.example .env.local
   `SUPABASE_SERVICE_ROLE_KEY`.
 - **Web Push (VAPID)**: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
   `VAPID_SUBJECT`.
-- **MercadoPago** (opcional, para cuotas con débito automático): `MP_ACCESS_TOKEN`,
-  `MP_WEBHOOK_SECRET`.
+- **MercadoPago** (opcional, para el pago de la cuota con Checkout Pro):
+  `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`. La conversión a marketplace (cobro con
+  la cuenta del gym por OAuth + comisión de plataforma) agrega, por fase,
+  `MP_CLIENT_ID`, `MP_CLIENT_SECRET` y `MP_TOKEN_ENC_KEY`.
 - **WhatsApp** (opcional, para el inbox manual): `WHATSAPP_PHONE_NUMBER_ID`,
   `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET`.
 

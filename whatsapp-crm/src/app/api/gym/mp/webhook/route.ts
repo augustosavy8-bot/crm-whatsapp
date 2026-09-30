@@ -1,18 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getPayment, mpConfigurado, verificarFirmaWebhook } from "@/lib/mercadopago";
-import { hoyISOArgentina } from "@/lib/tz";
-import { proximoVencimientoISO } from "@/lib/gymCuota";
 
 // Webhook de MercadoPago: MP nos avisa de cada cobro.
-// - payment approved -> acredita la cuota del socio (vence el 10 del mes que viene)
-//   y lo deja anotado en el libro de pagos.
+// - payment approved -> acredita la cuota del socio (vence el 10 del mes que
+//   viene), lo deja anotado en el libro de pagos y le reactiva los fijos dados
+//   de baja por deuda. Todo eso lo hace una sola función en la base
+//   (gym_registrar_pago_webhook -> gym__aplicar_pago), la MISMA lógica que el
+//   pago manual; el webhook solo la invoca. Idempotente por mp_last_payment_id.
 // No hay suscripciones/débito automático: todos los pagos son únicos.
 // Público (lo llama MP), fuera del proxy de sesión (está bajo /api).
-//
-// TODO(cuenta MP): con credenciales reales, VERIFICAR contra los payloads que
-// manda MP la forma de mapear payment -> socio (external_reference) y el
-// nombre exacto de los `type`. Está armado según la doc; ajustar al probar.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -68,38 +65,25 @@ export async function POST(request: NextRequest) {
           pago.external_reference ||
           (pago.metadata?.external_reference as string | undefined);
         if (alumnoId) {
-          const { data: al } = await sb
-            .from("gym_alumnos")
-            .select("id, tenant_id, cuota_hasta, mp_last_payment_id")
-            .eq("id", alumnoId)
-            .maybeSingle();
-          // Idempotencia: si ya procesamos ESTE payment, no volver a extender
-          // (MP reintenta los webhooks). dataId es el id del pago.
-          if (al && al.mp_last_payment_id !== dataId) {
-            const hoy = hoyISOArgentina();
-            const actual = al.cuota_hasta as string | null;
-            // Vencimiento siempre el 10 del mes que viene (regla única de cuota).
-            const nuevaCuota = proximoVencimientoISO(actual, hoy);
-            await sb
-              .from("gym_alumnos")
-              .update({
-                es_socio: true,
-                cuota_hasta: nuevaCuota,
-                mp_last_payment_id: dataId,
-              })
-              .eq("id", alumnoId);
-
-            // Deja el cobro anotado en el libro de pagos del socio, igual que un
-            // pago cargado a mano. Best-effort: si falla, no rompe el webhook.
-            await sb.from("gym_pagos").insert({
-              tenant_id: al.tenant_id,
-              alumno_id: alumnoId,
-              fecha: hoy,
-              monto: typeof pago.transaction_amount === "number" ? pago.transaction_amount : null,
-              metodo: "mercadopago",
-              nota: "Pago con MercadoPago",
-              cuota_hasta: nuevaCuota,
-            });
+          // Registro unificado con el pago manual: la función en la base calcula
+          // el vencimiento, deja el asiento en el libro y reactiva los fijos
+          // dados de baja por deuda. Idempotente por mp_last_payment_id: si MP
+          // reintenta el webhook, gym_registrar_pago_webhook devuelve null y no
+          // vuelve a acreditar. Deriva el tenant del propio alumno.
+          const monto =
+            typeof pago.transaction_amount === "number"
+              ? pago.transaction_amount
+              : null;
+          const { error } = await sb.rpc("gym_registrar_pago_webhook", {
+            p_alumno_id: alumnoId,
+            p_mp_payment_id: dataId,
+            p_monto: monto,
+            // Fase 0 (cuenta única, sin split): el bruto es el monto cobrado. El
+            // desglose (comisión MP / marketplace_fee / neto) se carga en Fase 3.
+            p_monto_bruto: monto,
+          });
+          if (error) {
+            console.error("[mp/webhook] gym_registrar_pago_webhook", error);
           }
         }
       }
