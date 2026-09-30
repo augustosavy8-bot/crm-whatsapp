@@ -77,7 +77,9 @@ export async function POST(request: NextRequest) {
       items,
       backUrl: `${origin}/mi-cuenta`,
       notificationUrl: `${origin}/api/gym/mp/webhook`,
-      email: alumno.email,
+      // No fijamos el email del pagador: si se presetea y el que se loguea en MP
+      // es otra cuenta (p. ej. el comprador de prueba), MP deshabilita "Pagar"
+      // por no coincidir. Sin email, lo paga cualquier cuenta logueada.
       marketplaceFee: fee,
     });
     return NextResponse.json({ ok: true, initPoint: pref.init_point });
