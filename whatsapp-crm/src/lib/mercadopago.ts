@@ -88,7 +88,8 @@ export async function crearPreferenciaPago(args: {
         failure: args.backUrl,
         pending: args.backUrl,
       },
-      auto_return: "approved",
+      // Sin auto_return: en el checkout de prueba el redirect automático suele
+      // tirar "algo salió mal". Queda el botón "Volver al sitio" del checkout.
       notification_url: args.notificationUrl,
     }),
   });
