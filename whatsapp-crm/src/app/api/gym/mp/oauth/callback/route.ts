@@ -30,6 +30,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const tok = await mpIntercambiarCode(code, st.verifier);
+
+    // Protección: no conectar la cuenta de la PLATAFORMA (dueña de la app /
+    // MP_CLIENT_ID). Si el usuario autorizó con esa cuenta en vez de la del gym,
+    // rechazamos sin guardar nada. El id se puede override por env; si no, usa el
+    // conocido del integrador.
+    const integrador = (process.env.MP_PLATFORM_USER_ID || "542801167").trim();
+    if (integrador && String(tok.user_id) === integrador) {
+      return NextResponse.redirect(`${base}/gym?mp=cuenta_plataforma`);
+    }
+
     await guardarMpConexion({
       tenantId: st.tenantId,
       tok,

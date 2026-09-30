@@ -51,32 +51,38 @@ export interface Preferencia {
   init_point?: string;
 }
 
-// Crea una preferencia de Checkout Pro para un PAGO ÚNICO (una cuota suelta) y
-// devuelve el init_point: la URL a la que el socio entra para pagar ese mes con
-// tarjeta/dinero en cuenta, SIN suscribirse. `external_reference` = alumnoId, que
-// es lo que el webhook usa para acreditar el pago y correr la cuota +1 mes.
+// Crea una preferencia de Checkout Pro para un PAGO ÚNICO (una cuota) y devuelve
+// el init_point: la URL a la que el socio entra para pagar ese mes. Se crea con
+// el ACCESS TOKEN DEL GYM (obtenido por OAuth), y `marketplace_fee` es el MONTO
+// fijo que retiene la plataforma (split). `external_reference` = alumnoId, que es
+// lo que el webhook usa para acreditar el pago y correr la cuota +1 mes.
 export async function crearPreferenciaPago(args: {
+  accessToken: string;
   alumnoId: string;
-  montoARS: number;
-  titulo: string;
+  items: Array<{ titulo: string; monto: number }>;
   backUrl: string;
   notificationUrl: string;
   email?: string | null;
+  marketplaceFee?: number;
 }): Promise<Preferencia> {
   const res = await fetch(`${MP_API}/checkout/preferences`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: {
+      Authorization: `Bearer ${args.accessToken}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      items: [
-        {
-          title: args.titulo,
-          quantity: 1,
-          unit_price: args.montoARS,
-          currency_id: "ARS",
-        },
-      ],
+      items: args.items.map((it) => ({
+        title: it.titulo,
+        quantity: 1,
+        unit_price: it.monto,
+        currency_id: "ARS",
+      })),
       external_reference: args.alumnoId,
       ...(args.email ? { payer: { email: args.email } } : {}),
+      ...(args.marketplaceFee && args.marketplaceFee > 0
+        ? { marketplace_fee: args.marketplaceFee }
+        : {}),
       back_urls: {
         success: args.backUrl,
         failure: args.backUrl,

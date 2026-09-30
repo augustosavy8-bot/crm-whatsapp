@@ -41,7 +41,20 @@ const MENSAJES: Record<string, string> = {
   error_state: "El pedido de conexión venció o ya se había usado. Probá de nuevo.",
   forbidden: "Solo un admin del gimnasio puede conectar Mercado Pago.",
   sin_config: "Faltan las credenciales de Mercado Pago (integrador).",
+  cuenta_plataforma:
+    "Esta es la cuenta de la plataforma, no la del gimnasio. Cerrá sesión en Mercado Pago e ingresá con la cuenta del gym.",
 };
+
+// Aviso antes de redirigir a MP: recordar que hay que entrar con la cuenta del gym.
+function irAConectar() {
+  if (
+    window.confirm(
+      "Asegurate de iniciar sesión con la cuenta de Mercado Pago del gimnasio (no la de la plataforma).",
+    )
+  ) {
+    window.location.href = "/api/gym/mp/oauth/start";
+  }
+}
 
 export default function MercadoPagoConexion() {
   const [loading, setLoading] = useState(true);
@@ -165,12 +178,13 @@ export default function MercadoPagoConexion() {
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <a
-                href="/api/gym/mp/oauth/start"
+              <button
+                type="button"
+                onClick={irAConectar}
                 className="rounded-full border border-line px-4 py-1.5 text-[13px] font-semibold text-ink transition-colors hover:border-accent"
               >
                 Reconectar
-              </a>
+              </button>
               <button
                 type="button"
                 onClick={desconectar}
@@ -183,13 +197,20 @@ export default function MercadoPagoConexion() {
             </div>
           </div>
         ) : (
-          <a
-            href="/api/gym/mp/oauth/start"
-            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-white transition-transform hover:brightness-95"
-            style={{ backgroundColor: "#009ee3" }}
-          >
-            Conectar Mercado Pago
-          </a>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={irAConectar}
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold text-white transition-transform hover:brightness-95"
+              style={{ backgroundColor: "#009ee3" }}
+            >
+              Conectar Mercado Pago
+            </button>
+            <p className="text-[12px] text-muted">
+              Vas a entrar a Mercado Pago: iniciá sesión con la cuenta del
+              gimnasio, no con la de la plataforma.
+            </p>
+          </div>
         )}
       </div>
     </div>

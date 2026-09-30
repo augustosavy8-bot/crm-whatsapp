@@ -2,14 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
-import { crearPreferenciaPago, mpConfigurado } from "@/lib/mercadopago";
+import { crearPreferenciaPago } from "@/lib/mercadopago";
 import { mpHabilitadoParaAlumno } from "@/lib/gymMpPrueba";
+import { getMpAccessTokenValido, getMpConfig } from "@/lib/mpCuentas";
 import { appBaseUrl } from "@/lib/appUrl";
 
-// Pago ÚNICO de la cuota, iniciado por el ALUMNO logueado (no el admin). Toma el
-// precio de su plan y crea una preferencia de Checkout Pro; el webhook existente
-// acredita el pago aprobado (corre cuota_hasta +1 mes) por external_reference.
-// Sin credenciales MP, responde 503 con un mensaje claro (no rompe nada).
+// Pago de la cuota iniciado por el ALUMNO logueado. Marketplace: la preferencia
+// se crea con el ACCESS TOKEN DEL GYM (OAuth) y se retiene la comisión de
+// plataforma vía marketplace_fee (MONTO fijo = % de la cuota, calculado en el
+// server). Quién absorbe el fee (gym o socio) sale de la config de plataforma.
+// El webhook acredita el pago aprobado por external_reference.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -28,19 +30,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!mpConfigurado()) {
+  // Token del gym (OAuth). Si el gym no tiene MP conectado (o el token no se
+  // pudo refrescar), no se puede cobrar: el botón además queda oculto en la UI.
+  const accessToken = await getMpAccessTokenValido(alumno.tenant_id);
+  if (!accessToken) {
     return NextResponse.json(
-      { error: "Los pagos online todavía no están habilitados. Pagá en el gimnasio." },
-      { status: 503 },
+      { error: "El gimnasio todavía no tiene Mercado Pago conectado." },
+      { status: 409 },
     );
   }
 
-  // El monto sale del precio del plan del socio. Fuente confiable: service
-  // client (no depende de que el alumno tenga RLS de lectura sobre gym_planes).
+  // Precio del plan del socio (service client: no depende del RLS del alumno).
   const svc = createServiceClient();
   const { data: al } = await svc
     .from("gym_alumnos")
-    .select("id, plan:gym_planes(nombre, precio)")
+    .select("plan:gym_planes(nombre, precio)")
     .eq("id", alumno.id)
     .maybeSingle();
   const plan = (al?.plan ?? null) as { nombre: string; precio: number } | null;
@@ -51,15 +55,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const precio = plan.precio;
+  const cfg = await getMpConfig();
+  const fee = Math.round((precio * cfg.comisionPct) / 100); // marketplace_fee (monto)
+
+  // (a) lo absorbe el gym: el socio paga la cuota; el fee sale del neto del gym.
+  // (b) lo paga el socio: se suma "Gastos de servicio" al total que paga.
+  const items =
+    cfg.quienPaga === "socio"
+      ? [
+          { titulo: `Cuota KINACTIVA — ${plan.nombre}`, monto: precio },
+          { titulo: "Gastos de servicio", monto: fee },
+        ]
+      : [{ titulo: `Cuota KINACTIVA — ${plan.nombre}`, monto: precio }];
+
   const origin = appBaseUrl(new URL(request.url).origin);
   try {
     const pref = await crearPreferenciaPago({
+      accessToken,
       alumnoId: alumno.id,
-      montoARS: plan.precio,
-      titulo: `Cuota KINACTIVA — ${plan.nombre}`,
+      items,
       backUrl: `${origin}/mi-cuenta`,
       notificationUrl: `${origin}/api/gym/mp/webhook`,
       email: alumno.email,
+      marketplaceFee: fee,
     });
     return NextResponse.json({ ok: true, initPoint: pref.init_point });
   } catch (e) {

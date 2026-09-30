@@ -194,3 +194,38 @@ export async function getMpAccessTokenValido(
     return null;
   }
 }
+
+// --- Config de plataforma (comisión) + estado liviano de conexión ---
+
+export interface MpPlataformaConfig {
+  comisionPct: number;
+  quienPaga: "gym" | "socio";
+}
+
+// Config global de la comisión (fila única). Default 3% / lo absorbe el gym.
+export async function getMpConfig(): Promise<MpPlataformaConfig> {
+  const sb = createServiceClient();
+  const { data } = await sb
+    .from("mp_plataforma_config")
+    .select("comision_pct, quien_paga_comision")
+    .limit(1)
+    .maybeSingle();
+  return {
+    comisionPct: data?.comision_pct != null ? Number(data.comision_pct) : 3,
+    quienPaga: (data?.quien_paga_comision as "gym" | "socio") ?? "gym",
+  };
+}
+
+// ¿El gym está en condiciones de cobrar por MP? (conectada o por vencer; el
+// token se refresca en el momento del cobro). Chequeo liviano, sin mutar.
+export async function mpGymConectado(tenantId: string): Promise<boolean> {
+  const sb = createServiceClient();
+  const { data } = await sb
+    .from("mp_cuentas_conectadas")
+    .select("estado, refresh_token_enc, access_token_enc")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (!data) return false;
+  const usable = data.estado === "conectada" || data.estado === "por_vencer";
+  return usable && (!!data.access_token_enc || !!data.refresh_token_enc);
+}

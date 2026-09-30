@@ -5,6 +5,7 @@ import { getGymContext } from "@/lib/gym";
 import { hoyISOArgentina } from "@/lib/tz";
 import { cuotaPorVencer } from "@/lib/gymCuota";
 import { mpHabilitadoParaAlumno } from "@/lib/gymMpPrueba";
+import { mpGymConectado } from "@/lib/mpCuentas";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import MiRutina, { type UltimoLog } from "@/components/gimnasio/MiRutina";
@@ -65,7 +66,7 @@ export default async function MiCuentaPage() {
 
   // Contexto del gym y precio del plan en paralelo (son independientes).
   const svc = createServiceClient();
-  const [gym, alPlan] = await Promise.all([
+  const [gym, alPlan, mpConectado] = await Promise.all([
     getGymContext(),
     svc
       .from("gym_alumnos")
@@ -73,6 +74,7 @@ export default async function MiCuentaPage() {
       .eq("id", alumno.id)
       .maybeSingle()
       .then((r) => r.data),
+    mpGymConectado(alumno.tenant_id),
   ]);
   const montoARS =
     (alPlan?.plan as unknown as { precio: number } | null)?.precio ?? null;
@@ -125,7 +127,8 @@ export default async function MiCuentaPage() {
         montoARS={montoARS}
         mostrarPago={
           cuotaPorVencer(alumno.cuota_hasta) &&
-          mpHabilitadoParaAlumno(alumno.telefono)
+          mpHabilitadoParaAlumno(alumno.telefono) &&
+          mpConectado
         }
       />
 
