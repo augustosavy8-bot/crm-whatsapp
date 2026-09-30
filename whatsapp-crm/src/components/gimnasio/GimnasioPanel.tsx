@@ -43,6 +43,7 @@ import {
 import { rutinaHabilitadaParaAlumno } from "@/lib/gymRutinaPrueba";
 import { normalizeArPhone } from "@/lib/phone";
 import { appBaseUrl } from "@/lib/appUrl";
+import MercadoPagoConexion from "@/components/gimnasio/MercadoPagoConexion";
 
 // ============================================================
 // Panel admin del gimnasio (owner / gym_admin). Dos tabs:
@@ -72,6 +73,7 @@ const TABS = [
   { key: "rutinas", label: "Rutinas" },
   { key: "socios", label: "Socios" },
   { key: "planes", label: "Planes" },
+  { key: "cobros", label: "Cobros" },
   { key: "horarios", label: "Horarios" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
@@ -99,9 +101,11 @@ export default function GimnasioPanel({
 }) {
   const [tab, setTab] = useState<Tab>("agenda");
 
-  // Filtra las pestañas según permisos: cobros (socios/planes) y rutinas.
+  // Filtra las pestañas según permisos: cobros (socios/planes/cobros) y rutinas.
   const tabs = TABS.filter((t) => {
-    if (t.key === "socios" || t.key === "planes") return puedeCobros;
+    if (t.key === "socios" || t.key === "planes" || t.key === "cobros") {
+      return puedeCobros;
+    }
     if (t.key === "rutinas") return puedeRutinas;
     return true;
   });
@@ -128,6 +132,7 @@ export default function GimnasioPanel({
       {tabActual === "rutinas" && puedeRutinas && <Rutinas tenantId={tenantId} />}
       {tabActual === "socios" && puedeCobros && <Socios tenantId={tenantId} />}
       {tabActual === "planes" && puedeCobros && <Planes />}
+      {tabActual === "cobros" && puedeCobros && <MercadoPagoConexion />}
       {tabActual === "horarios" && <Horarios tenantId={tenantId} />}
     </div>
   );
