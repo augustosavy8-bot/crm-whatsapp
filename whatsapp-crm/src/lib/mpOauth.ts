@@ -71,18 +71,46 @@ export interface MpTokenResponse {
   token_type?: string;
 }
 
+async function parseJson(res: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+function msgDe(data: Record<string, unknown>): string {
+  return (data.message as string) || (data.error as string) || "";
+}
+
+// El endpoint /oauth/token de MP acepta JSON; algunos entornos/errores esperan
+// form-urlencoded. Probamos JSON y, si falla, reintentamos como form, para no
+// depender del formato exacto. Si los dos fallan, tiramos el error más útil.
 async function tokenRequest(body: Record<string, unknown>): Promise<MpTokenResponse> {
-  const res = await fetch(MP_TOKEN_URL, {
+  const asJson = await fetch(MP_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
   });
-  const data = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    const msg = (data.message as string) || (data.error as string) || "error";
-    throw new Error(`MP OAuth ${res.status}: ${msg}`);
+  if (asJson.ok) return (await parseJson(asJson)) as unknown as MpTokenResponse;
+  const jsonErr = await parseJson(asJson);
+
+  const form = new URLSearchParams();
+  for (const [k, v] of Object.entries(body)) {
+    if (v !== undefined && v !== null) form.set(k, String(v));
   }
-  return data as unknown as MpTokenResponse;
+  const asForm = await fetch(MP_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: form.toString(),
+  });
+  if (asForm.ok) return (await parseJson(asForm)) as unknown as MpTokenResponse;
+
+  const formErr = await parseJson(asForm);
+  const msg = msgDe(formErr) || msgDe(jsonErr) || "error";
+  throw new Error(`MP OAuth ${asForm.status}: ${msg}`);
 }
 
 // Intercambia el `code` (con el code_verifier del PKCE) por los tokens del gym.
