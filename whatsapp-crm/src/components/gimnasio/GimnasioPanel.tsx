@@ -534,6 +534,23 @@ function Agenda({ tenantId }: { tenantId: string }) {
     else cargar();
   }
 
+  // Baja DEFINITIVA: saca al alumno de TODOS sus turnos fijos (todos los días),
+  // no solo hoy. Baja manual: no se reactiva al pagar. Para reponerlo, "Agregar".
+  async function darDeBajaFijo(alumnoId: string, nombre: string) {
+    if (
+      !confirm(
+        `¿Dar de baja a ${nombre} de sus turnos fijos? Deja de venir todas las semanas (todos sus días), no solo hoy. Para reponerlo, anotalo de nuevo con "Agregar".`,
+      )
+    ) {
+      return;
+    }
+    const { error } = await sb.rpc("gym_cancelar_fijos_alumno", {
+      p_alumno_id: alumnoId,
+    });
+    if (error) setError(error.message);
+    else cargar();
+  }
+
   // Confirmar/rechazar una reserva pendiente. Al confirmar, el alumno recibe un
   // push (si lo activó). El aviso por WhatsApp es aparte y manual (botón Avisar).
   async function decidir(
@@ -802,12 +819,20 @@ function Agenda({ tenantId }: { tenantId: string }) {
                                 Avisar
                               </button>
                               {a.tipo === "fijo" && a.turno_fijo_id ? (
-                                <button
-                                  onClick={() => noVieneHoy(a.turno_fijo_id!)}
-                                  className="text-[12px] font-semibold text-muted hover:text-danger"
-                                >
-                                  No viene hoy
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => noVieneHoy(a.turno_fijo_id!)}
+                                    className="text-[12px] font-semibold text-muted hover:text-danger"
+                                  >
+                                    No viene hoy
+                                  </button>
+                                  <button
+                                    onClick={() => darDeBajaFijo(a.alumno_id, a.nombre)}
+                                    className="text-[12px] font-semibold text-muted hover:text-danger"
+                                  >
+                                    Dar de baja
+                                  </button>
+                                </>
                               ) : a.reserva_id ? (
                                 <button
                                   onClick={() => quitarSuelta(a.reserva_id!)}
