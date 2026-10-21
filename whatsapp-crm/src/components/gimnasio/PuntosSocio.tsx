@@ -7,6 +7,7 @@ import {
   BONUS_CLASES_SEMANA,
   BONUS_PUNTOS,
   TOP_N,
+  TABLA_TOP,
 } from "@/lib/gymPuntos";
 
 // Resumen de Puntos del socio (compacto, va arriba): su puntaje y puesto, el
@@ -60,7 +61,7 @@ export default function PuntosSocio({
           <div className="text-right">
             <div className="text-[13px] text-muted">Tu puesto</div>
             <div className="text-xl font-bold">
-              {miPuesto ? `#${miPuesto}` : "—"}
+              {miPuesto ? (miPuesto > TABLA_TOP ? `+${TABLA_TOP}` : `#${miPuesto}`) : "—"}
             </div>
           </div>
         </div>

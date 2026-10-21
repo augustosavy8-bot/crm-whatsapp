@@ -13,6 +13,7 @@ export const PUNTOS_POR_ASISTENCIA = 1;
 export const BONUS_CLASES_SEMANA = 3; // clases en la semana para el bonus
 export const BONUS_PUNTOS = 2; // puntos de bonus por semana cumplida
 export const TOP_N = 3; // cuántos ganan el premio del mes
+export const TABLA_TOP = 10; // cuántos puestos se muestran; más abajo = "+10"
 
 export interface FilaPuntos {
   alumnoId: string;

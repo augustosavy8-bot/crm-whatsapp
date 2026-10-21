@@ -1,21 +1,22 @@
 "use client";
 
-import { type FilaPuntos } from "@/lib/gymPuntos";
+import { type FilaPuntos, TABLA_TOP } from "@/lib/gymPuntos";
 
 // Tabla completa del ranking del mes. Va en una sección aparte, DEBAJO de sacar
 // turno, para no competir con el valor principal. Si el socio no está en el top
-// 10, se agrega su propia fila al final.
+// TABLA_TOP, se agrega su propia fila al final mostrada como "+10" (genérico),
+// para no revelar cuántos socios hay en el gimnasio.
 
 const medalla = (puesto: number) =>
   puesto === 1 ? "🥇" : puesto === 2 ? "🥈" : puesto === 3 ? "🥉" : `${puesto}`;
 
 function Fila({
   f,
-  puesto,
+  puestoLabel,
   esMio,
 }: {
   f: FilaPuntos;
-  puesto: number;
+  puestoLabel: string;
   esMio: boolean;
 }) {
   return (
@@ -24,8 +25,8 @@ function Fila({
         esMio ? "bg-accent/10" : ""
       }`}
     >
-      <span className="w-6 shrink-0 text-center font-bold text-muted">
-        {medalla(puesto)}
+      <span className="w-8 shrink-0 text-center font-bold text-muted">
+        {puestoLabel}
       </span>
       <span className="min-w-0 flex-1 truncate font-medium text-ink">
         {f.nombre}
@@ -54,9 +55,9 @@ export default function PuntosTabla({
 }) {
   if (ranking.length === 0) return null;
 
-  const top = ranking.slice(0, 10);
+  const top = ranking.slice(0, TABLA_TOP);
   const miIndice = ranking.findIndex((f) => f.alumnoId === miAlumnoId);
-  const fueraDelTop = miIndice >= 10; // el socio no entra en el top 10
+  const fueraDelTop = miIndice >= TABLA_TOP; // el socio no entra en el top
 
   return (
     <section className="mb-5">
@@ -69,14 +70,14 @@ export default function PuntosTabla({
             <Fila
               key={f.alumnoId}
               f={f}
-              puesto={i + 1}
+              puestoLabel={medalla(i + 1)}
               esMio={f.alumnoId === miAlumnoId}
             />
           ))}
           {fueraDelTop && (
             <>
               <li className="px-4 py-1 text-center text-[12px] text-faint">···</li>
-              <Fila f={ranking[miIndice]} puesto={miIndice + 1} esMio />
+              <Fila f={ranking[miIndice]} puestoLabel={`+${TABLA_TOP}`} esMio />
             </>
           )}
         </ul>
