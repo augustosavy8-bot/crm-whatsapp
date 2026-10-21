@@ -7,11 +7,9 @@ import { cuotaPorVencer } from "@/lib/gymCuota";
 import { mpHabilitadoParaAlumno } from "@/lib/gymMpPrueba";
 import { mpGymConectado } from "@/lib/mpCuentas";
 import { puntosHabilitadoParaAlumno } from "@/lib/gymPuntosPrueba";
-import { calcularRankingMes, type FilaPuntos } from "@/lib/gymPuntos";
+import { getPuntosData, type PuntosData } from "@/lib/gymPuntosData";
 import PuntosSocio from "@/components/gimnasio/PuntosSocio";
 import PuntosTabla from "@/components/gimnasio/PuntosTabla";
-import QRCode from "qrcode";
-import { appBaseUrl } from "@/lib/appUrl";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import MiRutina, { type UltimoLog } from "@/components/gimnasio/MiRutina";
@@ -118,57 +116,10 @@ export default async function MiCuentaPage() {
     }
   }
 
-  // Puntos (gateado a la cuenta de prueba): ranking del mes desde la asistencia
-  // que ya se registra (gym_asistencias, 'presente'). Se calcula server-side con
-  // el service client porque arma el ranking de todos los socios del tenant.
-  let puntos: {
-    ranking: FilaPuntos[];
-    mesLabel: string;
-    checkinUrl: string;
-    checkinQr: string;
-  } | null = null;
+  // Puntos (gateado a la cuenta de prueba): ranking del mes + QR de check-in.
+  let puntos: PuntosData | null = null;
   if (puntosHabilitadoParaAlumno(alumno.telefono)) {
-    const hoy = hoyISOArgentina();
-    const anio = Number(hoy.slice(0, 4));
-    const mes = Number(hoy.slice(5, 7));
-    const inicio = `${anio}-${String(mes).padStart(2, "0")}-01`;
-    const nAnio = mes === 12 ? anio + 1 : anio;
-    const nMes = mes === 12 ? 1 : mes + 1;
-    const fin = `${nAnio}-${String(nMes).padStart(2, "0")}-01`;
-    const [asisRes, alumnosRes] = await Promise.all([
-      svc
-        .from("gym_asistencias")
-        .select("alumno_id, fecha")
-        .eq("tenant_id", alumno.tenant_id)
-        .eq("estado", "presente")
-        .gte("fecha", inicio)
-        .lt("fecha", fin),
-      svc.from("gym_alumnos").select("id, nombre").eq("tenant_id", alumno.tenant_id),
-    ]);
-    const nombres = new Map(
-      ((alumnosRes.data ?? []) as { id: string; nombre: string }[]).map((a) => [
-        a.id,
-        a.nombre,
-      ]),
-    );
-    const ranking = calcularRankingMes(
-      ((asisRes.data ?? []) as { alumno_id: string; fecha: string }[]).map((r) => ({
-        alumno_id: r.alumno_id,
-        fecha: r.fecha,
-        nombre: nombres.get(r.alumno_id) ?? "Socio",
-      })),
-    );
-    const mesLabel = new Intl.DateTimeFormat("es-AR", {
-      timeZone: "America/Argentina/Buenos_Aires",
-      month: "long",
-      year: "numeric",
-    }).format(new Date(`${hoy}T12:00:00Z`));
-    const checkinUrl = `${appBaseUrl()}/checkin`;
-    const checkinQr = await QRCode.toDataURL(checkinUrl, {
-      margin: 1,
-      width: 256,
-    });
-    puntos = { ranking, mesLabel, checkinUrl, checkinQr };
+    puntos = await getPuntosData(alumno.tenant_id);
   }
 
   return (

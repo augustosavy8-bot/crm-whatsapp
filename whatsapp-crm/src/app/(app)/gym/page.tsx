@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { currentAgent, esGymStaff } from "@/lib/agent";
 import { staffPuedeRutinas } from "@/lib/gymRutinaPrueba";
+import { puntosPanelHabilitado } from "@/lib/gymPuntosPrueba";
+import { getPuntosData } from "@/lib/gymPuntosData";
 import GimnasioPanel from "@/components/gimnasio/GimnasioPanel";
 import PushButton from "@/components/notifications/PushButton";
 
@@ -11,6 +13,9 @@ export default async function GymPanelPage() {
   const agent = await currentAgent();
   if (!agent) redirect("/login");
   if (!esGymStaff(agent)) redirect("/turnos");
+
+  const puedePuntos = puntosPanelHabilitado(agent.email);
+  const puntosData = puedePuntos ? await getPuntosData(agent.tenant_id) : null;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -29,6 +34,8 @@ export default async function GymPanelPage() {
           tenantId={agent.tenant_id}
           puedeCobros={agent.role === "owner" || agent.gym_admin}
           puedeRutinas={staffPuedeRutinas(agent.email)}
+          puedePuntos={puedePuntos}
+          puntosData={puntosData}
         />
       </div>
     </div>

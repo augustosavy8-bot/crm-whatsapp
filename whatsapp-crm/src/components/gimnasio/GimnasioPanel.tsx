@@ -44,6 +44,8 @@ import { rutinaHabilitadaParaAlumno } from "@/lib/gymRutinaPrueba";
 import { normalizeArPhone } from "@/lib/phone";
 import { appBaseUrl } from "@/lib/appUrl";
 import MercadoPagoConexion from "@/components/gimnasio/MercadoPagoConexion";
+import PuntosPanel from "@/components/gimnasio/PuntosPanel";
+import { type PuntosData } from "@/lib/gymPuntosData";
 
 // ============================================================
 // Panel admin del gimnasio (owner / gym_admin). Dos tabs:
@@ -74,6 +76,7 @@ const TABS = [
   { key: "socios", label: "Socios" },
   { key: "planes", label: "Planes" },
   { key: "cobros", label: "Cobros" },
+  { key: "puntos", label: "Puntos" },
   { key: "horarios", label: "Horarios" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
@@ -91,6 +94,8 @@ export default function GimnasioPanel({
   tenantId,
   puedeCobros = true,
   puedeRutinas = false,
+  puedePuntos = false,
+  puntosData = null,
 }: {
   tenantId: string;
   // Acceso a cobros (socios y planes). Un profe "solo agenda" (sin gym_admin)
@@ -98,15 +103,20 @@ export default function GimnasioPanel({
   puedeCobros?: boolean;
   // Acceso a armar rutinas (en prueba: solo el staff habilitado).
   puedeRutinas?: boolean;
+  // Acceso al panel de Puntos (en prueba: solo el admin habilitado).
+  puedePuntos?: boolean;
+  puntosData?: PuntosData | null;
 }) {
   const [tab, setTab] = useState<Tab>("agenda");
 
-  // Filtra las pestañas según permisos: cobros (socios/planes/cobros) y rutinas.
+  // Filtra las pestañas según permisos: cobros (socios/planes/cobros), rutinas
+  // y puntos.
   const tabs = TABS.filter((t) => {
     if (t.key === "socios" || t.key === "planes" || t.key === "cobros") {
       return puedeCobros;
     }
     if (t.key === "rutinas") return puedeRutinas;
+    if (t.key === "puntos") return puedePuntos;
     return true;
   });
   const tabActual = tabs.some((t) => t.key === tab) ? tab : "agenda";
@@ -133,6 +143,9 @@ export default function GimnasioPanel({
       {tabActual === "socios" && puedeCobros && <Socios tenantId={tenantId} />}
       {tabActual === "planes" && puedeCobros && <Planes />}
       {tabActual === "cobros" && puedeCobros && <MercadoPagoConexion />}
+      {tabActual === "puntos" && puedePuntos && puntosData && (
+        <PuntosPanel data={puntosData} />
+      )}
       {tabActual === "horarios" && <Horarios tenantId={tenantId} />}
     </div>
   );

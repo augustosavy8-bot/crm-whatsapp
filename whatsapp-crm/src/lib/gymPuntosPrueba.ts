@@ -12,3 +12,13 @@ const TELEFONOS_PRUEBA_PUNTOS = new Set<string>([
 export function puntosHabilitadoParaAlumno(telefono: string | null): boolean {
   return !!telefono && TELEFONOS_PRUEBA_PUNTOS.has(telefono);
 }
+
+// Gate del panel de Puntos para el staff (ver el ranking + el QR desde el panel
+// de admin). Por ahora solo la cuenta de admin de prueba.
+const EMAILS_PANEL_PUNTOS = new Set<string>([
+  "augustosavy8@gmail.com", // Augusto (admin)
+]);
+
+export function puntosPanelHabilitado(email: string | null): boolean {
+  return !!email && EMAILS_PANEL_PUNTOS.has(email.toLowerCase());
+}
