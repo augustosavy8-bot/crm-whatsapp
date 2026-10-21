@@ -10,6 +10,8 @@ import { puntosHabilitadoParaAlumno } from "@/lib/gymPuntosPrueba";
 import { calcularRankingMes, type FilaPuntos } from "@/lib/gymPuntos";
 import PuntosSocio from "@/components/gimnasio/PuntosSocio";
 import PuntosTabla from "@/components/gimnasio/PuntosTabla";
+import QRCode from "qrcode";
+import { appBaseUrl } from "@/lib/appUrl";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import MiRutina, { type UltimoLog } from "@/components/gimnasio/MiRutina";
@@ -119,7 +121,12 @@ export default async function MiCuentaPage() {
   // Puntos (gateado a la cuenta de prueba): ranking del mes desde la asistencia
   // que ya se registra (gym_asistencias, 'presente'). Se calcula server-side con
   // el service client porque arma el ranking de todos los socios del tenant.
-  let puntos: { ranking: FilaPuntos[]; mesLabel: string } | null = null;
+  let puntos: {
+    ranking: FilaPuntos[];
+    mesLabel: string;
+    checkinUrl: string;
+    checkinQr: string;
+  } | null = null;
   if (puntosHabilitadoParaAlumno(alumno.telefono)) {
     const hoy = hoyISOArgentina();
     const anio = Number(hoy.slice(0, 4));
@@ -156,7 +163,12 @@ export default async function MiCuentaPage() {
       month: "long",
       year: "numeric",
     }).format(new Date(`${hoy}T12:00:00Z`));
-    puntos = { ranking, mesLabel };
+    const checkinUrl = `${appBaseUrl()}/checkin`;
+    const checkinQr = await QRCode.toDataURL(checkinUrl, {
+      margin: 1,
+      width: 256,
+    });
+    puntos = { ranking, mesLabel, checkinUrl, checkinQr };
   }
 
   return (
@@ -184,6 +196,8 @@ export default async function MiCuentaPage() {
           ranking={puntos.ranking}
           miAlumnoId={alumno.id}
           mesLabel={puntos.mesLabel}
+          checkinUrl={puntos.checkinUrl}
+          checkinQr={puntos.checkinQr}
         />
       )}
 

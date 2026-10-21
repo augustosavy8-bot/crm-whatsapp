@@ -21,12 +21,17 @@ export default function PuntosSocio({
   ranking,
   miAlumnoId,
   mesLabel,
+  checkinUrl,
+  checkinQr,
 }: {
   ranking: FilaPuntos[];
   miAlumnoId: string;
   mesLabel: string;
+  checkinUrl: string;
+  checkinQr: string;
 }) {
   const [comoFunciona, setComoFunciona] = useState(false);
+  const [verQr, setVerQr] = useState(false);
 
   const miIndice = ranking.findIndex((f) => f.alumnoId === miAlumnoId);
   const mia = miIndice >= 0 ? ranking[miIndice] : null;
@@ -107,6 +112,50 @@ export default function PuntosSocio({
                 );
               })}
             </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Check-in */}
+      <div className="rounded-panel border border-line bg-surface p-4 shadow-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold text-ink">Marcá tu asistencia</div>
+            <div className="text-[12px] text-muted">
+              Sumá tus puntos cuando venís a entrenar.
+            </div>
+          </div>
+          <a
+            href="/checkin"
+            className="shrink-0 rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-white hover:brightness-95"
+          >
+            Check-in
+          </a>
+        </div>
+        <button
+          type="button"
+          onClick={() => setVerQr((v) => !v)}
+          className="mt-2 text-[12px] font-semibold text-muted hover:text-ink"
+        >
+          {verQr ? "Ocultar QR del gym" : "QR para pegar en el gym"}
+        </button>
+        {verQr && (
+          <div className="mt-2 flex flex-col items-center gap-2 rounded-card bg-surface-2 p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={checkinQr}
+              alt="QR de check-in del gimnasio"
+              width={180}
+              height={180}
+              className="rounded"
+            />
+            <p className="text-center text-[12px] text-muted">
+              Pegá este QR en el gimnasio: los socios lo escanean (o tocan su chip
+              NFC) para marcar asistencia.
+            </p>
+            <code className="break-all text-center text-[11px] text-faint">
+              {checkinUrl}
+            </code>
           </div>
         )}
       </div>
