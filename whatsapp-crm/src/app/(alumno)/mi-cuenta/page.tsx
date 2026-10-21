@@ -9,6 +9,7 @@ import { mpGymConectado } from "@/lib/mpCuentas";
 import { puntosHabilitadoParaAlumno } from "@/lib/gymPuntosPrueba";
 import { calcularRankingMes, type FilaPuntos } from "@/lib/gymPuntos";
 import PuntosSocio from "@/components/gimnasio/PuntosSocio";
+import PuntosTabla from "@/components/gimnasio/PuntosTabla";
 import ClasesFlow from "@/components/gimnasio/ClasesFlow";
 import CompletarTelefono from "@/components/gimnasio/CompletarTelefono";
 import MiRutina, { type UltimoLog } from "@/components/gimnasio/MiRutina";
@@ -193,6 +194,10 @@ export default async function MiCuentaPage() {
         />
       ) : (
         <CompletarTelefono />
+      )}
+
+      {puntos && (
+        <PuntosTabla ranking={puntos.ranking} miAlumnoId={alumno.id} />
       )}
 
       {rutina && (

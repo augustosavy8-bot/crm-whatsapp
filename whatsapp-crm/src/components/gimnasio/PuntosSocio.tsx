@@ -9,8 +9,12 @@ import {
   TOP_N,
 } from "@/lib/gymPuntos";
 
-// Vista de Puntos del socio (gateada a la cuenta de prueba): su puntaje del mes,
-// su puesto en el ranking y cómo se gana. Los puntos salen de la asistencia.
+// Resumen de Puntos del socio (compacto, va arriba): su puntaje y puesto, el
+// TOP 3 del mes y "cómo funciona". La tabla completa es otra sección (PuntosTabla)
+// para no taparle protagonismo a sacar turno.
+
+const medalla = (puesto: number) =>
+  puesto === 1 ? "🥇" : puesto === 2 ? "🥈" : puesto === 3 ? "🥉" : `${puesto}`;
 
 export default function PuntosSocio({
   ranking,
@@ -27,10 +31,7 @@ export default function PuntosSocio({
   const mia = miIndice >= 0 ? ranking[miIndice] : null;
   const miPuesto = miIndice >= 0 ? miIndice + 1 : null;
   const voyGanando = miPuesto != null && miPuesto <= TOP_N;
-
-  const top = ranking.slice(0, 10);
-  const medalla = (puesto: number) =>
-    puesto === 1 ? "🥇" : puesto === 2 ? "🥈" : puesto === 3 ? "🥉" : null;
+  const top3 = ranking.slice(0, 3);
 
   return (
     <section className="mb-5 space-y-3">
@@ -47,7 +48,7 @@ export default function PuntosSocio({
         </button>
       </div>
 
-      {/* Mi puntaje */}
+      {/* Mi puntaje + top 3 */}
       <div className="rounded-panel border border-line bg-surface p-4 shadow-card">
         <div className="flex items-end justify-between">
           <div>
@@ -63,21 +64,49 @@ export default function PuntosSocio({
             </div>
           </div>
         </div>
-        {mia ? (
-          <p className="mt-2 text-[13px] text-muted">
-            {mia.asistencias} asistencia{mia.asistencias === 1 ? "" : "s"}
-            {mia.bonus > 0 ? ` · +${mia.bonus} de bonus` : ""}.
-            {voyGanando
-              ? " 🎉 ¡Vas entre los que se llevan el premio!"
-              : miPuesto
-                ? ` Top ${TOP_N} se lleva el premio del mes.`
-                : ""}
-          </p>
-        ) : (
-          <p className="mt-2 text-[13px] text-muted">
-            Todavía no sumaste asistencias este mes. ¡Vení a entrenar y empezá a
-            sumar!
-          </p>
+        <p className="mt-2 text-[13px] text-muted">
+          {mia
+            ? `${mia.asistencias} asistencia${mia.asistencias === 1 ? "" : "s"}${
+                mia.bonus > 0 ? ` · +${mia.bonus} de bonus` : ""
+              }.`
+            : "Todavía no sumaste asistencias este mes."}{" "}
+          {voyGanando
+            ? "🎉 ¡Vas entre los que se llevan el premio!"
+            : `Top ${TOP_N} se lleva el premio del mes.`}
+        </p>
+
+        {top3.length > 0 && (
+          <div className="mt-3 border-t border-line pt-3">
+            <div className="mb-1.5 text-[12px] font-semibold text-muted">
+              Top 3 del mes
+            </div>
+            <ul className="space-y-1">
+              {top3.map((f, i) => {
+                const esMio = f.alumnoId === miAlumnoId;
+                return (
+                  <li
+                    key={f.alumnoId}
+                    className="flex items-center gap-2 text-[13px]"
+                  >
+                    <span className="w-5 shrink-0 text-center">
+                      {medalla(i + 1)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-ink">
+                      {f.nombre}
+                      {esMio && (
+                        <span className="ml-1 text-[11px] font-semibold text-accent">
+                          (vos)
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 font-bold text-ink">
+                      {f.puntos}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
       </div>
 
@@ -106,51 +135,6 @@ export default function PuntosSocio({
           </p>
         </div>
       )}
-
-      {/* Ranking */}
-      <div className="rounded-panel border border-line bg-surface shadow-card">
-        <div className="border-b border-line px-4 py-2.5 text-[13px] font-semibold">
-          Tabla del mes
-        </div>
-        {top.length === 0 ? (
-          <p className="px-4 py-4 text-[13px] text-faint">
-            Todavía no hay asistencias cargadas este mes.
-          </p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {top.map((f, i) => {
-              const puesto = i + 1;
-              const esMio = f.alumnoId === miAlumnoId;
-              return (
-                <li
-                  key={f.alumnoId}
-                  className={`flex items-center gap-3 px-4 py-2.5 text-[13px] ${
-                    esMio ? "bg-accent/10" : ""
-                  }`}
-                >
-                  <span className="w-6 shrink-0 text-center font-bold text-muted">
-                    {medalla(puesto) ?? puesto}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-ink">
-                    {f.nombre}
-                    {esMio && (
-                      <span className="ml-1 text-[11px] font-semibold text-accent">
-                        (vos)
-                      </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 text-right text-muted">
-                    {f.asistencias} asis{f.bonus > 0 ? ` · +${f.bonus}` : ""}
-                  </span>
-                  <span className="w-10 shrink-0 text-right font-bold text-ink">
-                    {f.puntos}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
     </section>
   );
 }
