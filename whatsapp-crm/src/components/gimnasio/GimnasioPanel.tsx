@@ -8,6 +8,7 @@ import {
   crearGymHorario,
   eliminarSocio,
   getAsistencias,
+  getAsistenciasSocio,
   getDeudaResumen,
   getDiasCerrados,
   getGymAlumnos,
@@ -23,6 +24,7 @@ import {
   setGymHorarioActivo,
   updateGymSocio,
   type AsistenciaEstado,
+  type GymAsistenciaSocio,
   type GymAlumnoEnClase,
   type GymCuotaAdeudada,
   type GymDiaCerrado,
@@ -1347,6 +1349,12 @@ function Socios({ tenantId }: { tenantId: string }) {
   const [pagosPorSocio, setPagosPorSocio] = useState<Record<string, GymPago[]>>({});
   const [pagosAbierto, setPagosAbierto] = useState<string | null>(null);
   const [cargandoPagos, setCargandoPagos] = useState(false);
+  // Asistencias (historial por socio): cuál está abierto y lo cargado.
+  const [asistPorSocio, setAsistPorSocio] = useState<
+    Record<string, GymAsistenciaSocio[]>
+  >({});
+  const [asistAbierto, setAsistAbierto] = useState<string | null>(null);
+  const [cargandoAsist, setCargandoAsist] = useState(false);
   // Formulario de pago manual: cuál socio está abierto y sus campos.
   const [pagoManualId, setPagoManualId] = useState<string | null>(null);
   const [pmMonto, setPmMonto] = useState("");
@@ -1608,6 +1616,26 @@ function Socios({ tenantId }: { tenantId: string }) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar los pagos.");
     } finally {
       setCargandoPagos(false);
+    }
+  }
+
+  async function toggleAsist(s: GymSocio) {
+    if (asistAbierto === s.id) {
+      setAsistAbierto(null);
+      return;
+    }
+    setAsistAbierto(s.id);
+    if (asistPorSocio[s.id]) return; // ya cargado
+    setCargandoAsist(true);
+    try {
+      const lista = await getAsistenciasSocio(sb, s.id);
+      setAsistPorSocio((prev) => ({ ...prev, [s.id]: lista }));
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "No se pudieron cargar las asistencias.",
+      );
+    } finally {
+      setCargandoAsist(false);
     }
   }
 
@@ -2123,6 +2151,12 @@ function Socios({ tenantId }: { tenantId: string }) {
                   >
                     {pagosAbierto === s.id ? "Ocultar pagos" : "Ver pagos"}
                   </button>
+                  <button
+                    onClick={() => toggleAsist(s)}
+                    className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-muted hover:border-faint hover:text-ink"
+                  >
+                    {asistAbierto === s.id ? "Ocultar asistencias" : "Ver asistencias"}
+                  </button>
                   <div className="flex rounded-full bg-surface-2 p-0.5">
                     {(["efectivo", "mercadopago"] as const).map((m) => (
                       <button
@@ -2283,6 +2317,56 @@ function Socios({ tenantId }: { tenantId: string }) {
                           </li>
                         ))}
                       </ul>
+                    )}
+                  </div>
+                )}
+                {/* Asistencias del socio (historial). */}
+                {asistAbierto === s.id && (
+                  <div className="mt-2 rounded-lg border border-line bg-surface-2 p-3">
+                    <div className="mb-1.5 text-[12px] font-bold text-ink">
+                      Asistencias
+                    </div>
+                    {cargandoAsist && !asistPorSocio[s.id] ? (
+                      <p className="text-[12px] text-muted">Cargando…</p>
+                    ) : (asistPorSocio[s.id]?.length ?? 0) === 0 ? (
+                      <p className="text-[12px] text-muted">
+                        Todavía no hay asistencias registradas.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="mb-1.5 text-[11px] text-muted">
+                          {asistPorSocio[s.id]!.filter((a) => a.estado === "presente").length}{" "}
+                          presente(s) ·{" "}
+                          {asistPorSocio[s.id]!.filter((a) => a.estado === "ausente").length}{" "}
+                          ausente(s)
+                        </p>
+                        <ul className="divide-y divide-line">
+                          {asistPorSocio[s.id]?.map((a, i) => (
+                            <li
+                              key={`${a.fecha}-${i}`}
+                              className="flex items-center justify-between gap-3 py-1.5"
+                            >
+                              <span className="text-[13px] font-semibold text-ink">
+                                {fechaCorta(a.fecha)}
+                                {a.horaInicio && (
+                                  <span className="ml-2 text-[11px] font-normal text-muted">
+                                    {hhmm(a.horaInicio)} hs
+                                  </span>
+                                )}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  a.estado === "presente"
+                                    ? "bg-ok/15 text-ok"
+                                    : "bg-danger/10 text-danger"
+                                }`}
+                              >
+                                {a.estado === "presente" ? "Presente" : "Ausente"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     )}
                   </div>
                 )}

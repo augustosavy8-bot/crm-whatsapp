@@ -371,6 +371,38 @@ export async function marcarAsistencia(
   if (error) throw error;
 }
 
+// Historial de asistencias de un socio (lo más reciente primero), para el perfil
+// del alumno en el panel. Trae la hora de la clase para mostrarla.
+export interface GymAsistenciaSocio {
+  fecha: string; // YYYY-MM-DD
+  estado: AsistenciaEstado; // presente | ausente
+  horaInicio: string | null; // "HH:MM:SS"
+}
+
+export async function getAsistenciasSocio(
+  sb: SupabaseClient,
+  alumnoId: string,
+): Promise<GymAsistenciaSocio[]> {
+  const { data, error } = await sb
+    .from("gym_asistencias")
+    .select("fecha, estado, horario:gym_horarios(hora_inicio)")
+    .eq("alumno_id", alumnoId)
+    .order("fecha", { ascending: false })
+    .limit(90);
+  if (error) throw error;
+  return (
+    (data ?? []) as unknown as {
+      fecha: string;
+      estado: AsistenciaEstado;
+      horario: { hora_inicio: string } | null;
+    }[]
+  ).map((r) => ({
+    fecha: r.fecha,
+    estado: r.estado,
+    horaInicio: r.horario?.hora_inicio ?? null,
+  }));
+}
+
 // --- Planes ---
 
 export async function getPlanes(sb: SupabaseClient): Promise<GymPlan[]> {
