@@ -147,8 +147,6 @@ export default async function MiCuentaPage() {
           ranking={puntos.ranking}
           miAlumnoId={alumno.id}
           mesLabel={puntos.mesLabel}
-          checkinUrl={puntos.checkinUrl}
-          checkinQr={puntos.checkinQr}
         />
       )}
 
