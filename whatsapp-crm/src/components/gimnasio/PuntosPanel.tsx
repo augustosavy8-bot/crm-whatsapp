@@ -2,6 +2,7 @@
 
 import { type PuntosData } from "@/lib/gymPuntosData";
 import PuntosTabla from "@/components/gimnasio/PuntosTabla";
+import UbicacionCheckin from "@/components/gimnasio/UbicacionCheckin";
 
 // Panel de Puntos para el staff (admin): el QR de check-in del gym para imprimir
 // y el ranking del mes. No es socio, así que la tabla no resalta ninguna fila.
@@ -35,6 +36,8 @@ export default function PuntosPanel({ data }: { data: PuntosData }) {
           </code>
         </div>
       </div>
+
+      <UbicacionCheckin />
 
       <PuntosTabla ranking={data.ranking} miAlumnoId="" />
     </div>

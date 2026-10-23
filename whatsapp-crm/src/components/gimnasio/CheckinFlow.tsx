@@ -12,6 +12,22 @@ interface Clase {
 
 const hhmm = (h: string) => h.slice(0, 5);
 
+// Ubicación actual del socio (para el anti-trampa). null si no se puede obtener
+// (sin permiso / sin GPS); el server decide si hace falta.
+function obtenerUbicacion(): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  });
+}
+
 // Pantalla a la que llega el socio al escanear el QR del gym o tocar su chip.
 // Muestra sus clases de hoy y le deja marcar la asistencia (suma puntos).
 export default function CheckinFlow({ clases }: { clases: Clase[] }) {
@@ -26,10 +42,11 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
     setError(null);
     setEstado((s) => ({ ...s, [horarioId]: "cargando" }));
     try {
+      const coords = await obtenerUbicacion();
       const res = await fetch("/api/gym/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ horarioId }),
+        body: JSON.stringify({ horarioId, ...(coords ?? {}) }),
       });
       const d = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !d.ok) {

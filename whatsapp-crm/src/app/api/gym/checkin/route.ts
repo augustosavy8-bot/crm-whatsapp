@@ -5,6 +5,8 @@ import { getCurrentAlumno } from "@/lib/alumno";
 import { puntosHabilitadoParaAlumno } from "@/lib/gymPuntosPrueba";
 import { getMisReservas } from "@/lib/gymCupo";
 import { hoyISOArgentina } from "@/lib/tz";
+import { getCheckinConfig } from "@/lib/gymCheckinConfig";
+import { distanciaMetros } from "@/lib/geo";
 
 // Check-in del socio: marca su propia asistencia de HOY a una clase que tiene
 // reservada (fijo de hoy o suelta de hoy). Eso alimenta los puntos. El QR del
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { horarioId?: string };
+  let body: { horarioId?: string; lat?: number; lng?: number };
   try {
     body = await request.json();
   } catch {
@@ -53,6 +55,30 @@ export async function POST(request: NextRequest) {
       { error: "No tenés esa clase reservada para hoy." },
       { status: 400 },
     );
+  }
+
+  // Anti-trampa: si el gym configuró su ubicación, el socio tiene que estar
+  // dentro del radio para marcar asistencia (no se puede desde casa).
+  const cfg = await getCheckinConfig(alumno.tenant_id);
+  if (cfg.configurada) {
+    const lat = typeof body.lat === "number" ? body.lat : null;
+    const lng = typeof body.lng === "number" ? body.lng : null;
+    if (lat === null || lng === null) {
+      return NextResponse.json(
+        {
+          error:
+            "Necesitamos tu ubicación para marcar asistencia. Activá el GPS y permití el acceso a la ubicación.",
+        },
+        { status: 400 },
+      );
+    }
+    const dist = distanciaMetros(lat, lng, cfg.lat!, cfg.lng!);
+    if (dist > cfg.radioM) {
+      return NextResponse.json(
+        { error: "Tenés que estar en el gimnasio para marcar asistencia." },
+        { status: 400 },
+      );
+    }
   }
 
   const svc = createServiceClient();
