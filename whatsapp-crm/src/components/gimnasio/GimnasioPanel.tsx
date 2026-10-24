@@ -110,6 +110,7 @@ export default function GimnasioPanel({
   puntosData?: PuntosData | null;
 }) {
   const [tab, setTab] = useState<Tab>("agenda");
+  const [menuAbierto, setMenuAbierto] = useState(false);
 
   // Filtra las pestañas según permisos: cobros (socios/planes/cobros), rutinas
   // y puntos.
@@ -125,19 +126,49 @@ export default function GimnasioPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex rounded-full bg-surface-2 p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={[
-              "flex-1 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-              tabActual === t.key ? "bg-ink text-white" : "text-muted hover:text-ink",
-            ].join(" ")}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMenuAbierto((v) => !v)}
+          className="flex w-full items-center justify-between rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-white"
+        >
+          <span>{tabs.find((t) => t.key === tabActual)?.label ?? "Menú"}</span>
+          <span
+            className={`ml-2 text-white/70 transition-transform ${
+              menuAbierto ? "rotate-180" : ""
+            }`}
           >
-            {t.label}
-          </button>
-        ))}
+            ▾
+          </span>
+        </button>
+        {menuAbierto && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setMenuAbierto(false)}
+              aria-hidden
+            />
+            <div className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-2xl border border-line bg-surface shadow-pop">
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => {
+                    setTab(t.key);
+                    setMenuAbierto(false);
+                  }}
+                  className={[
+                    "block w-full px-4 py-2.5 text-left text-sm font-semibold transition-colors",
+                    tabActual === t.key
+                      ? "bg-surface-2 text-ink"
+                      : "text-muted hover:bg-surface-2 hover:text-ink",
+                  ].join(" ")}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {tabActual === "agenda" && <Agenda tenantId={tenantId} />}
