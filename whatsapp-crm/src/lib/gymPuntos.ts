@@ -48,9 +48,12 @@ export function calcularRankingMes(
     meta: number;
   }[],
 ): FilaPuntos[] {
+  // Por alumno: para cada semana, el conjunto de DÍAS distintos con asistencia.
+  // Contamos días, no filas: si alguien marca dos veces el mismo día (p.ej. una
+  // clase reservada + un "vine a entrenar"), cuenta como un solo día.
   const porAlumno = new Map<
     string,
-    { nombre: string; meta: number; porSemana: Map<string, number> }
+    { nombre: string; meta: number; porSemana: Map<string, Set<string>> }
   >();
 
   for (const a of asistencias) {
@@ -60,7 +63,12 @@ export function calcularRankingMes(
       porAlumno.set(a.alumno_id, e);
     }
     const wk = lunesDeSemana(a.fecha);
-    e.porSemana.set(wk, (e.porSemana.get(wk) ?? 0) + 1);
+    let dias = e.porSemana.get(wk);
+    if (!dias) {
+      dias = new Set();
+      e.porSemana.set(wk, dias);
+    }
+    dias.add(a.fecha);
   }
 
   const filas: FilaPuntos[] = [];
@@ -71,7 +79,8 @@ export function calcularRankingMes(
     let semanasCompletas = 0;
     let semanasMedias = 0;
     let puntos = 0;
-    for (const n of e.porSemana.values()) {
+    for (const dias of e.porSemana.values()) {
+      const n = dias.size; // días distintos de esa semana
       asistencias += n;
       if (n >= meta) {
         semanasCompletas += 1;

@@ -1,16 +1,17 @@
 import { redirect } from "next/navigation";
 import { currentAlumno } from "@/lib/alumno";
 import { puntosHabilitadoParaAlumno } from "@/lib/gymPuntosPrueba";
-import { getMisReservas } from "@/lib/gymCupo";
-import { hoyISOArgentina } from "@/lib/tz";
+import { getMisReservas, getHorariosDia } from "@/lib/gymCupo";
+import { hoyISOArgentina, horaActualArgentina } from "@/lib/tz";
 import { createServiceClient } from "@/lib/supabase/service";
-import CheckinFlow from "@/components/gimnasio/CheckinFlow";
+import CheckinFlow, { type Clase } from "@/components/gimnasio/CheckinFlow";
 
 export const dynamic = "force-dynamic";
 
 // Pantalla a la que llega el socio al escanear el QR del gimnasio o tocar su chip
 // NFC (ambos apuntan a /checkin). Resuelve sus clases de HOY y le deja marcar la
-// asistencia. Gateada a la cuenta de prueba por ahora.
+// asistencia. Si no tiene turno reservado, igual puede marcar "Vine a entrenar"
+// contra la clase en curso. Gateada a las cuentas de prueba por ahora.
 export default async function CheckinPage() {
   const alumno = await currentAlumno();
   if (!alumno) redirect("/login");
@@ -18,9 +19,14 @@ export default async function CheckinPage() {
     redirect("/mi-cuenta");
 
   const hoy = hoyISOArgentina();
+  const ahora = horaActualArgentina(); // "HH:MM:SS"
   const diaSemana = new Date(`${hoy}T12:00:00Z`).getUTCDay();
 
-  const reservas = alumno.telefono ? await getMisReservas(alumno.telefono) : [];
+  // Reservas de hoy (fijo de hoy o suelta de hoy) + horarios activos del día.
+  const [reservas, horariosHoy] = await Promise.all([
+    alumno.telefono ? getMisReservas(alumno.telefono) : Promise.resolve([]),
+    getHorariosDia(alumno.tenant_id, hoy),
+  ]);
   const deHoy = reservas.filter(
     (r) =>
       (r.tipo === "suelta" && r.fecha === hoy) ||
@@ -39,26 +45,41 @@ export default async function CheckinPage() {
       .filter((a) => a.estado === "presente")
       .map((a) => a.horario_id),
   );
+  const yaRegistroHoy = presentes.size > 0;
 
-  // Dedup por horario (por si hay fijo + suelta en el mismo horario).
-  const porHorario = new Map<
-    string,
-    { horarioId: string; horaInicio: string; horaFin: string; tipo: "fijo" | "suelta"; yaPresente: boolean }
-  >();
-  for (const r of deHoy) {
-    if (!porHorario.has(r.horario_id)) {
-      porHorario.set(r.horario_id, {
-        horarioId: r.horario_id,
-        horaInicio: r.hora_inicio,
-        horaFin: r.hora_fin,
-        tipo: r.tipo,
-        yaPresente: presentes.has(r.horario_id),
-      });
+  let clases: Clase[];
+  if (deHoy.length > 0) {
+    // Caso normal: tiene turno(s) reservado(s) hoy. Marca por clase.
+    const porHorario = new Map<string, Clase>();
+    for (const r of deHoy) {
+      if (!porHorario.has(r.horario_id)) {
+        porHorario.set(r.horario_id, {
+          horarioId: r.horario_id,
+          horaInicio: r.hora_inicio,
+          horaFin: r.hora_fin,
+          tipo: r.tipo,
+          yaPresente: presentes.has(r.horario_id),
+        });
+      }
     }
+    clases = [...porHorario.values()];
+  } else {
+    // Sin reserva: ofrece "Vine a entrenar" contra la clase en curso. Si no hay
+    // clase justo ahora (fuera de horario), deja elegir entre las del día.
+    const claseAhora = horariosHoy.find(
+      (h) => h.hora_inicio <= ahora && ahora < h.hora_fin,
+    );
+    const base = claseAhora ? [claseAhora] : horariosHoy;
+    clases = base.map((h) => ({
+      horarioId: h.horario_id,
+      horaInicio: h.hora_inicio,
+      horaFin: h.hora_fin,
+      tipo: "libre" as const,
+      yaPresente: presentes.has(h.horario_id),
+    }));
   }
-  const clases = [...porHorario.values()].sort((a, b) =>
-    a.horaInicio.localeCompare(b.horaInicio),
-  );
 
-  return <CheckinFlow clases={clases} />;
+  clases.sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+
+  return <CheckinFlow clases={clases} yaRegistroHoy={yaRegistroHoy} />;
 }

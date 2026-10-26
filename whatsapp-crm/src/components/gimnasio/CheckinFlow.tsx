@@ -2,15 +2,22 @@
 
 import { useEffect, useState } from "react";
 
-interface Clase {
+export interface Clase {
   horarioId: string;
   horaInicio: string; // "HH:MM:SS"
   horaFin: string;
-  tipo: "fijo" | "suelta";
+  tipo: "fijo" | "suelta" | "libre"; // libre = sin reserva ("vine a entrenar")
   yaPresente: boolean;
 }
 
 const hhmm = (h: string) => h.slice(0, 5);
+
+const subtitulo = (tipo: Clase["tipo"]) =>
+  tipo === "fijo"
+    ? "Turno fijo"
+    : tipo === "suelta"
+      ? "Reserva de hoy"
+      : "Sin reserva · marcá que viniste";
 
 // Ubicación actual del socio (para el anti-trampa). null si no se puede obtener
 // (sin permiso / sin GPS); el server decide si hace falta.
@@ -32,10 +39,10 @@ function obtenerUbicacion(): Promise<{ lat: number; lng: number } | null> {
 // quedó registrada. Aparece ni bien el server responde OK.
 function OverlayExito({
   hora,
-  onCerrarAria,
+  onCerrar,
 }: {
   hora: string;
-  onCerrarAria: () => void;
+  onCerrar: () => void;
 }) {
   // Vibración de confirmación (si el teléfono la soporta).
   useEffect(() => {
@@ -65,7 +72,7 @@ function OverlayExito({
       </p>
       <button
         type="button"
-        onClick={onCerrarAria}
+        onClick={onCerrar}
         className="mt-8 rounded-full bg-white px-6 py-2.5 text-[14px] font-bold text-ok shadow-lg"
       >
         Listo
@@ -85,7 +92,13 @@ function OverlayExito({
 
 // Pantalla a la que llega el socio al escanear el QR del gym o tocar su chip.
 // Muestra sus clases de hoy y le deja marcar la asistencia (suma puntos).
-export default function CheckinFlow({ clases }: { clases: Clase[] }) {
+export default function CheckinFlow({
+  clases,
+  yaRegistroHoy,
+}: {
+  clases: Clase[];
+  yaRegistroHoy: boolean;
+}) {
   const [estado, setEstado] = useState<Record<string, "ok" | "cargando">>(
     Object.fromEntries(
       clases.filter((c) => c.yaPresente).map((c) => [c.horarioId, "ok"]),
@@ -94,6 +107,8 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
   const [error, setError] = useState<string | null>(null);
   // Clase recién marcada → dispara el overlay de confirmación.
   const [exito, setExito] = useState<{ hora: string } | null>(null);
+
+  const soloLibres = clases.length > 0 && clases.every((c) => c.tipo === "libre");
 
   async function marcar(horarioId: string, hora: string) {
     setError(null);
@@ -127,15 +142,19 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
     }
   }
 
+  const algoMarcado = clases.some((c) => estado[c.horarioId] === "ok");
+
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-6 sm:pt-8">
       {exito && (
-        <OverlayExito hora={exito.hora} onCerrarAria={() => setExito(null)} />
+        <OverlayExito hora={exito.hora} onCerrar={() => setExito(null)} />
       )}
 
       <h1 className="text-xl font-bold tracking-tight">Check-in</h1>
       <p className="mt-0.5 text-[13px] text-muted">
-        Marcá tu asistencia de hoy y sumá tus puntos.
+        {soloLibres
+          ? "No tenías turno reservado. Marcá que viniste y sumá igual."
+          : "Marcá tu asistencia de hoy y sumá tus puntos."}
       </p>
 
       {error && (
@@ -147,33 +166,31 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
       {clases.length === 0 ? (
         <div className="mt-5 rounded-panel border border-line bg-surface p-4 text-[13px] text-muted shadow-card">
           <p className="font-semibold text-ink">
-            No tenés una clase reservada para hoy.
+            Hoy el gimnasio no tiene clases.
           </p>
-          <p className="mt-1">
-            El check-in marca la asistencia de una clase que tengas reservada.
-            Reservá tu turno de hoy y después volvé a escanear el QR.
-          </p>
+          <p className="mt-1">Volvé a escanear el QR en un día con clases.</p>
           <div className="mt-3">
             <a
               href="/mi-cuenta"
               className="inline-block rounded-full bg-ink px-4 py-2 text-[13px] font-bold text-white"
             >
-              Ir a reservar
+              Volver a mi cuenta
             </a>
           </div>
         </div>
       ) : (
         <ul className="mt-5 space-y-3">
           {clases.map((c) => {
-            const st = estado[c.horarioId];
-            const listo = st === "ok";
+            // Si ya registró hoy, no dejamos marcar otra clase "libre" (los
+            // puntos cuentan por día, igual no sumaría de nuevo).
+            const listo =
+              estado[c.horarioId] === "ok" ||
+              (c.tipo === "libre" && yaRegistroHoy && !estado[c.horarioId]);
             return (
               <li
                 key={c.horarioId}
                 className={`flex items-center justify-between gap-3 rounded-panel border p-4 shadow-card transition-colors ${
-                  listo
-                    ? "border-ok/40 bg-ok/10"
-                    : "border-line bg-surface"
+                  listo ? "border-ok/40 bg-ok/10" : "border-line bg-surface"
                 }`}
               >
                 <div>
@@ -181,7 +198,7 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
                     {hhmm(c.horaInicio)}–{hhmm(c.horaFin)} hs
                   </div>
                   <div className="text-[12px] text-muted">
-                    {c.tipo === "fijo" ? "Turno fijo" : "Reserva de hoy"}
+                    {subtitulo(c.tipo)}
                   </div>
                 </div>
                 {listo ? (
@@ -192,10 +209,14 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
                   <button
                     type="button"
                     onClick={() => marcar(c.horarioId, hhmm(c.horaInicio))}
-                    disabled={st === "cargando"}
+                    disabled={estado[c.horarioId] === "cargando"}
                     className="shrink-0 rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-95 disabled:opacity-50"
                   >
-                    {st === "cargando" ? "Registrando…" : "Marcar asistencia"}
+                    {estado[c.horarioId] === "cargando"
+                      ? "Registrando…"
+                      : c.tipo === "libre"
+                        ? "Vine a entrenar"
+                        : "Marcar asistencia"}
                   </button>
                 )}
               </li>
@@ -204,7 +225,7 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
         </ul>
       )}
 
-      {clases.some((c) => estado[c.horarioId] === "ok") && (
+      {(algoMarcado || yaRegistroHoy) && (
         <div className="mt-5 rounded-panel border border-ok/40 bg-ok/10 p-4 text-[13px] font-semibold text-ink shadow-card">
           ✓ Tu asistencia de hoy quedó registrada y sumaste tus puntos.
           <div className="mt-3">

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentAlumno } from "@/lib/alumno";
 import { puntosHabilitadoParaAlumno } from "@/lib/gymPuntosPrueba";
-import { getMisReservas } from "@/lib/gymCupo";
+import { getHorariosDia } from "@/lib/gymCupo";
 import { hoyISOArgentina } from "@/lib/tz";
 import { getCheckinConfig } from "@/lib/gymCheckinConfig";
 import { distanciaMetros } from "@/lib/geo";
@@ -40,19 +40,15 @@ export async function POST(request: NextRequest) {
   }
 
   const hoy = hoyISOArgentina();
-  const diaSemana = new Date(`${hoy}T12:00:00Z`).getUTCDay();
 
-  // Validación: el socio tiene ESA clase reservada HOY (fijo de hoy o suelta de hoy).
-  const reservas = alumno.telefono ? await getMisReservas(alumno.telefono) : [];
-  const valida = reservas.some(
-    (r) =>
-      r.horario_id === horarioId &&
-      ((r.tipo === "suelta" && r.fecha === hoy) ||
-        (r.tipo === "fijo" && r.dia_semana === diaSemana)),
-  );
+  // Validación: el horario tiene que ser una clase ACTIVA del gym para hoy. No
+  // exigimos reserva previa: el socio puede marcar "vine a entrenar" a cualquier
+  // clase del día (el anti-trampa por ubicación es lo que evita el abuso).
+  const horariosHoy = await getHorariosDia(alumno.tenant_id, hoy);
+  const valida = horariosHoy.some((h) => h.horario_id === horarioId);
   if (!valida) {
     return NextResponse.json(
-      { error: "No tenés esa clase reservada para hoy." },
+      { error: "Esa clase no está disponible hoy." },
       { status: 400 },
     );
   }

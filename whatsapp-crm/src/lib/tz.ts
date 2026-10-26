@@ -67,6 +67,17 @@ export function hoyISOArgentina(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: AR_TZ });
 }
 
+/** Hora actual en Buenos Aires, "HH:MM:SS" (24h). Ubica la clase en curso. */
+export function horaActualArgentina(): string {
+  return new Date().toLocaleTimeString("en-GB", {
+    timeZone: AR_TZ,
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 /** "YYYY-MM-DD" del instante dado, en Buenos Aires. Sirve para agrupar por día. */
 export function arDateKey(iso: string | Date): string {
   const d = typeof iso === "string" ? new Date(iso) : iso;
