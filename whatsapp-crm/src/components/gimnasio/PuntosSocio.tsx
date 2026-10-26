@@ -3,11 +3,10 @@
 import { useState } from "react";
 import {
   type FilaPuntos,
-  PUNTOS_POR_ASISTENCIA,
-  BONUS_CLASES_SEMANA,
-  BONUS_PUNTOS,
   TOP_N,
   TABLA_TOP,
+  PUNTOS_SEMANA_COMPLETA,
+  PUNTOS_MEDIA_SEMANA,
 } from "@/lib/gymPuntos";
 
 // Resumen de Puntos del socio (compacto, va arriba): su puntaje y puesto, el
@@ -67,9 +66,7 @@ export default function PuntosSocio({
         </div>
         <p className="mt-2 text-[13px] text-muted">
           {mia
-            ? `${mia.asistencias} asistencia${mia.asistencias === 1 ? "" : "s"}${
-                mia.bonus > 0 ? ` · +${mia.bonus} de bonus` : ""
-              }.`
+            ? `${mia.asistencias} asistencia${mia.asistencias === 1 ? "" : "s"} · ${mia.semanasCompletas} semana${mia.semanasCompletas === 1 ? "" : "s"} completa${mia.semanasCompletas === 1 ? "" : "s"}.`
             : "Todavía no sumaste asistencias este mes."}{" "}
           {voyGanando
             ? "🎉 ¡Vas entre los que se llevan el premio!"
@@ -117,22 +114,23 @@ export default function PuntosSocio({
           <p className="font-semibold text-ink">Cómo se ganan los puntos</p>
           <ul className="mt-1.5 space-y-1 text-muted">
             <li>
-              • <b className="text-ink">{PUNTOS_POR_ASISTENCIA} punto</b> por cada
-              clase a la que asistís (cuando queda marcada tu asistencia).
+              • <b className="text-ink">Semana completa</b>: si vas todos los días
+              de tu plan en la semana, sumás{" "}
+              <b className="text-ink">{PUNTOS_SEMANA_COMPLETA} puntos</b>.
             </li>
             <li>
-              • <b className="text-ink">Bonus de constancia:</b> si completás{" "}
-              <b className="text-ink">{BONUS_CLASES_SEMANA} clases en una semana</b>,
-              sumás <b className="text-ink">+{BONUS_PUNTOS} puntos</b> esa semana.
+              • <b className="text-ink">Media semana</b>: si vas al menos la mitad
+              de los días de tu plan, sumás{" "}
+              <b className="text-ink">{PUNTOS_MEDIA_SEMANA} punto</b>.
             </li>
             <li>
-              • A fin de mes, los <b className="text-ink">{TOP_N} con más puntos</b>{" "}
-              se llevan el premio.
+              • Tu puntaje del mes es la suma de todas las semanas. A fin de mes,
+              los <b className="text-ink">{TOP_N} con más puntos</b> se llevan el
+              premio.
             </li>
           </ul>
           <p className="mt-2 text-faint">
-            Próximamente vas a poder marcar tu asistencia escaneando el QR del
-            gimnasio o con tu chip.
+            Tu asistencia queda marcada cuando venís a entrenar; con eso ya sumás.
           </p>
         </div>
       )}

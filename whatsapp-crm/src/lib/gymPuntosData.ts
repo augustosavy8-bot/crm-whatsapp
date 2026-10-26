@@ -2,7 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { hoyISOArgentina } from "@/lib/tz";
 import { appBaseUrl } from "@/lib/appUrl";
 import QRCode from "qrcode";
-import { calcularRankingMes, type FilaPuntos } from "@/lib/gymPuntos";
+import { calcularRankingMes, META_DEFAULT, type FilaPuntos } from "@/lib/gymPuntos";
 
 // Datos de Puntos del mes para un tenant: ranking (desde gym_asistencias) + el
 // QR de check-in del gym. SOLO servidor (service client). Lo usan la vista del
@@ -33,21 +33,37 @@ export async function getPuntosData(tenantId: string): Promise<PuntosData> {
       .eq("estado", "presente")
       .gte("fecha", inicio)
       .lt("fecha", fin),
-    svc.from("gym_alumnos").select("id, nombre").eq("tenant_id", tenantId),
+    svc
+      .from("gym_alumnos")
+      .select("id, nombre, plan:gym_planes(dias_semana)")
+      .eq("tenant_id", tenantId),
   ]);
 
-  const nombres = new Map(
-    ((alumnosRes.data ?? []) as { id: string; nombre: string }[]).map((a) => [
-      a.id,
-      a.nombre,
-    ]),
-  );
+  // Por socio: nombre + meta semanal (días del plan; default si no tiene plan).
+  const info = new Map<string, { nombre: string; meta: number }>();
+  for (const a of (alumnosRes.data ?? []) as {
+    id: string;
+    nombre: string;
+    plan:
+      | { dias_semana: number | null }
+      | { dias_semana: number | null }[]
+      | null;
+  }[]) {
+    const plan = Array.isArray(a.plan) ? a.plan[0] : a.plan;
+    const meta = plan?.dias_semana ?? META_DEFAULT;
+    info.set(a.id, { nombre: a.nombre, meta: meta > 0 ? meta : META_DEFAULT });
+  }
+
   const ranking = calcularRankingMes(
-    ((asisRes.data ?? []) as { alumno_id: string; fecha: string }[]).map((r) => ({
-      alumno_id: r.alumno_id,
-      fecha: r.fecha,
-      nombre: nombres.get(r.alumno_id) ?? "Socio",
-    })),
+    ((asisRes.data ?? []) as { alumno_id: string; fecha: string }[]).map((r) => {
+      const i = info.get(r.alumno_id);
+      return {
+        alumno_id: r.alumno_id,
+        fecha: r.fecha,
+        nombre: i?.nombre ?? "Socio",
+        meta: i?.meta ?? META_DEFAULT,
+      };
+    }),
   );
 
   const mesLabel = new Intl.DateTimeFormat("es-AR", {

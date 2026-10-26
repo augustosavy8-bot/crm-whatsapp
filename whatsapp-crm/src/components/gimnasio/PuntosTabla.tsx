@@ -37,7 +37,9 @@ function Fila({
         )}
       </span>
       <span className="shrink-0 text-right text-muted">
-        {f.asistencias} asis{f.bonus > 0 ? ` · +${f.bonus}` : ""}
+        {f.semanasCompletas > 0
+          ? `${f.semanasCompletas} sem`
+          : `${f.asistencias} asis`}
       </span>
       <span className="w-10 shrink-0 text-right font-bold text-ink">
         {f.puntos}
