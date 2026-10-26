@@ -31,6 +31,7 @@ export function puntosHabilitadoParaAlumno(
 const EMAILS_PANEL_PUNTOS = new Set<string>([
   "augustosavy8@gmail.com", // Augusto (admin)
   "chichisavy18@gmail.com",
+  "giangym@gmail.com", // Gian Orlandi (profe)
 ]);
 
 export function puntosPanelHabilitado(email: string | null): boolean {
