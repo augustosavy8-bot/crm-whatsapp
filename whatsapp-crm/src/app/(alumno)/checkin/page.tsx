@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
 export default async function CheckinPage() {
   const alumno = await currentAlumno();
   if (!alumno) redirect("/login");
-  if (!puntosHabilitadoParaAlumno(alumno.telefono)) redirect("/mi-cuenta");
+  if (!puntosHabilitadoParaAlumno(alumno.telefono, alumno.email))
+    redirect("/mi-cuenta");
 
   const hoy = hoyISOArgentina();
   const diaSemana = new Date(`${hoy}T12:00:00Z`).getUTCDay();

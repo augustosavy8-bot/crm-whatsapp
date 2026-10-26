@@ -118,7 +118,7 @@ export default async function MiCuentaPage() {
 
   // Puntos (gateado a la cuenta de prueba): ranking del mes + QR de check-in.
   let puntos: PuntosData | null = null;
-  if (puntosHabilitadoParaAlumno(alumno.telefono)) {
+  if (puntosHabilitadoParaAlumno(alumno.telefono, alumno.email)) {
     puntos = await getPuntosData(alumno.tenant_id);
   }
 

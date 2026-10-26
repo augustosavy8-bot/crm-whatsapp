@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   if (!alumno) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
-  if (!puntosHabilitadoParaAlumno(alumno.telefono)) {
+  if (!puntosHabilitadoParaAlumno(alumno.telefono, alumno.email)) {
     return NextResponse.json(
       { error: "El check-in todavía no está habilitado." },
       { status: 403 },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Clase {
   horarioId: string;
@@ -28,6 +28,61 @@ function obtenerUbicacion(): Promise<{ lat: number; lng: number } | null> {
   });
 }
 
+// Overlay a pantalla completa que confirma, sin lugar a dudas, que la asistencia
+// quedó registrada. Aparece ni bien el server responde OK.
+function OverlayExito({
+  hora,
+  onCerrarAria,
+}: {
+  hora: string;
+  onCerrarAria: () => void;
+}) {
+  // Vibración de confirmación (si el teléfono la soporta).
+  useEffect(() => {
+    try {
+      navigator.vibrate?.([30, 40, 30]);
+    } catch {
+      /* no pasa nada */
+    }
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-ok/95 px-6 text-center text-white animate-[fadeIn_200ms_ease-out]"
+      role="status"
+      aria-live="assertive"
+    >
+      <div className="animate-[pop_320ms_cubic-bezier(.17,.67,.3,1.33)]">
+        <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/40">
+          <span className="text-6xl leading-none">✓</span>
+        </div>
+      </div>
+      <div className="mt-6 text-3xl font-black tracking-tight">
+        ¡Asistencia registrada!
+      </div>
+      <p className="mt-2 text-[15px] font-semibold text-white/90">
+        Clase de las {hora} hs · sumaste tus puntos 🎉
+      </p>
+      <button
+        type="button"
+        onClick={onCerrarAria}
+        className="mt-8 rounded-full bg-white px-6 py-2.5 text-[14px] font-bold text-ok shadow-lg"
+      >
+        Listo
+      </button>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes pop {
+          0% { transform: scale(.4); opacity: 0 }
+          60% { transform: scale(1.08); opacity: 1 }
+          100% { transform: scale(1) }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Pantalla a la que llega el socio al escanear el QR del gym o tocar su chip.
 // Muestra sus clases de hoy y le deja marcar la asistencia (suma puntos).
 export default function CheckinFlow({ clases }: { clases: Clase[] }) {
@@ -37,8 +92,10 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
     ),
   );
   const [error, setError] = useState<string | null>(null);
+  // Clase recién marcada → dispara el overlay de confirmación.
+  const [exito, setExito] = useState<{ hora: string } | null>(null);
 
-  async function marcar(horarioId: string) {
+  async function marcar(horarioId: string, hora: string) {
     setError(null);
     setEstado((s) => ({ ...s, [horarioId]: "cargando" }));
     try {
@@ -59,6 +116,7 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
         return;
       }
       setEstado((s) => ({ ...s, [horarioId]: "ok" }));
+      setExito({ hora });
     } catch {
       setError("Sin conexión. Probá de nuevo.");
       setEstado((s) => {
@@ -71,6 +129,10 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
 
   return (
     <main className="mx-auto max-w-md px-4 pb-16 pt-6 sm:pt-8">
+      {exito && (
+        <OverlayExito hora={exito.hora} onCerrarAria={() => setExito(null)} />
+      )}
+
       <h1 className="text-xl font-bold tracking-tight">Check-in</h1>
       <p className="mt-0.5 text-[13px] text-muted">
         Marcá tu asistencia de hoy y sumá tus puntos.
@@ -84,8 +146,13 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
 
       {clases.length === 0 ? (
         <div className="mt-5 rounded-panel border border-line bg-surface p-4 text-[13px] text-muted shadow-card">
-          No tenés una clase reservada para hoy. Reservá tu turno y después marcás
-          el check-in.
+          <p className="font-semibold text-ink">
+            No tenés una clase reservada para hoy.
+          </p>
+          <p className="mt-1">
+            El check-in marca la asistencia de una clase que tengas reservada.
+            Reservá tu turno de hoy y después volvé a escanear el QR.
+          </p>
           <div className="mt-3">
             <a
               href="/mi-cuenta"
@@ -103,7 +170,11 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
             return (
               <li
                 key={c.horarioId}
-                className="flex items-center justify-between gap-3 rounded-panel border border-line bg-surface p-4 shadow-card"
+                className={`flex items-center justify-between gap-3 rounded-panel border p-4 shadow-card transition-colors ${
+                  listo
+                    ? "border-ok/40 bg-ok/10"
+                    : "border-line bg-surface"
+                }`}
               >
                 <div>
                   <div className="font-semibold text-ink">
@@ -114,13 +185,13 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
                   </div>
                 </div>
                 {listo ? (
-                  <span className="shrink-0 rounded-full bg-ok/15 px-3 py-1.5 text-[13px] font-bold text-ok">
+                  <span className="shrink-0 rounded-full bg-ok px-3 py-1.5 text-[13px] font-bold text-white">
                     ✓ Registrada
                   </span>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => marcar(c.horarioId)}
+                    onClick={() => marcar(c.horarioId, hhmm(c.horaInicio))}
                     disabled={st === "cargando"}
                     className="shrink-0 rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-95 disabled:opacity-50"
                   >
@@ -134,8 +205,8 @@ export default function CheckinFlow({ clases }: { clases: Clase[] }) {
       )}
 
       {clases.some((c) => estado[c.horarioId] === "ok") && (
-        <div className="mt-5 rounded-panel border border-line bg-surface-2 p-4 text-[13px] shadow-card">
-          🎉 ¡Listo! Tu asistencia quedó registrada y sumaste tus puntos.
+        <div className="mt-5 rounded-panel border border-ok/40 bg-ok/10 p-4 text-[13px] font-semibold text-ink shadow-card">
+          ✓ Tu asistencia de hoy quedó registrada y sumaste tus puntos.
           <div className="mt-3">
             <a
               href="/mi-cuenta"
