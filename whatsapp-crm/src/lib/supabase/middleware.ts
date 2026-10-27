@@ -66,9 +66,14 @@ export async function updateSession(request: NextRequest) {
     const { data: claimsData } = await supabase.auth.getClaims();
     const appRole = claimsData?.claims?.app_role as string | undefined;
     if (appRole === "alumno") {
-      // El alumno solo tiene su panel. Cualquier otra ruta (el CRM, el gym
-      // admin, la raíz) lo devuelve a /mi-cuenta. RLS igual lo protege.
-      const enPanel = path === "/mi-cuenta" || path.startsWith("/mi-cuenta/");
+      // El alumno solo tiene su panel y el check-in por QR. Cualquier otra ruta
+      // (el CRM, el gym admin, la raíz) lo devuelve a /mi-cuenta. RLS igual lo
+      // protege.
+      const enPanel =
+        path === "/mi-cuenta" ||
+        path.startsWith("/mi-cuenta/") ||
+        path === "/checkin" ||
+        path.startsWith("/checkin/");
       if (!enPanel) {
         const url = request.nextUrl.clone();
         url.pathname = "/mi-cuenta";
