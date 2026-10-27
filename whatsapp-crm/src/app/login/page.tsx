@@ -51,8 +51,19 @@ export default function LoginPage() {
       if (error) throw error;
 
       const rol = leerAppRole(data.session?.access_token);
-      const destino =
+      const destinoRol =
         rol === "alumno" ? "/mi-cuenta" : rol === "profesional" ? "/gym" : "/";
+      // Si venimos de una pantalla que pidió volver (?next=/checkin), respetamos
+      // ese destino (solo rutas internas, para no abrir redirects a otros sitios).
+      const next = (() => {
+        try {
+          const n = new URLSearchParams(window.location.search).get("next");
+          return n && n.startsWith("/") && !n.startsWith("//") ? n : null;
+        } catch {
+          return null;
+        }
+      })();
+      const destino = next ?? destinoRol;
 
       // Que la animación se vea: esperamos a que pase RUN_MS (menos si el
       // usuario pidió menos movimiento).
